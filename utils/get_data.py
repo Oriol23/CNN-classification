@@ -1,4 +1,4 @@
-"""Contains functions for extracting data into the data folder. 
+"""Contains functions for extracting a torchvision dataset into the data folder of the project. 
 
 """
 import os
