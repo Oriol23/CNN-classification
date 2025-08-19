@@ -4,7 +4,7 @@ import torch
 from torch import nn 
 
 
-class TinyVGG(nn.Module):
+class TinyVGG_1(nn.Module):
     """Creates a smaller version of the VGG-Net architecture.
 
         (No padding on the convolution)
@@ -73,14 +73,38 @@ class TinyVGG(nn.Module):
         return self.layer_3(self.layer_2(self.layer_1(x))) 
 
 
-#New possible architectures
-    #TinyVGG with padding 1
-    #TinyVGG with doubling channels every pool
-    #TinyVGG with 2 linear layers or 3 since some models have 3 (LeNet, AlexNet)
-    #TinyVGG with linear layers with dropout
-    #Change around the conv layers, instead of doing 
+#Possible changes
+        #Changing number of epochs and number of hidden channels
+    #TinyVGG_1 with padding 1
+    #TinyVGG_2 with doubling channels every pool
+    #TinyVGG_3.0 and TinyVGG_3.1 with 2 linear layers or 3 since some models have 3 (LeNet, AlexNet)
+        #Changing number of nodes in the hidden layer or layers
+    #TinyVGG_3.0 and 3.1 with linear layers with dropout
+    #TinyVGG_4 changing around the conv layers, i.e instead of doing 
     #   conv conv pool conv conv pool, try
     #   conv pool conc conv conv pool or smth
+
+# Instead of logging with
+    #runs/timestamp/experiment_name/model_name/extra (Daniel Bourke style)
+#try loggging with
+    #runs/model_name/experiment_name/extra
+#experiment_name will be default for the default architecture and something like 'padding 1' or 'dropout' for the 
+#experiments that take a model that has been tested by default and change something other than its architecture 
+#(and hyperparameters like batch size and number of epochs, which will go in extra)
+#And at the same time, create another folder to store additional data about the experiment
+    #runs_metadata/model_name/experiment_name/extra
+    #and inside store a dictionary with all the information
+    #timestamp, model, hyperparameters (epochs, initial hidden channels, batch size), optimizer, loss function, 
+    #dataset... 
+
+#also make a more detailed log of the experiments, which explains every experiment name in more detail. 
+
+#TO DO
+    #In helpers create metadata add OPTIMIZER PARAMETERS LIKE LEARNING RATE, MOMENTUM, ...
+    #Create a function to retrieve experiment metadata (needs /model_name/experiment_name/extra)
+    #Finish creating the rest of the utils
+    #Start creating an experimenting pipeline
+    #migrate to colab
 
 
 """VGG-Net architecture 
