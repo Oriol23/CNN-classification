@@ -5,6 +5,8 @@ import torch
 
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
+#import torch.utils.tensorboard
+from torch.utils.tensorboard import SummaryWriter
 
 from config import device
 
@@ -97,12 +99,12 @@ def train(model: torch.nn.Module,
           optimizer: torch.optim.Optimizer,
           loss_fn: torch.nn.Module,
           epochs: int, 
-          writer: torch.utils.tensorboard.writer.SummaryWriter,  #type: ignore
-          device=device # new parameter to take in a writer 
+          writer=None,  
+          device=device
           ) -> Dict[str, List]:
     """Trains and tests a PyTorch model.
 
-    Passes a target PyTorch models through train_step() and test_step()
+    Passes a target PyTorch model through train_step() and test_step()
     functions for a number of epochs, training and testing the model
     in the same epoch loop.
 
@@ -171,7 +173,6 @@ def train(model: torch.nn.Module,
 
         ### New: Use the writer parameter to track experiments ###
         # See if there's a writer, if so, log to it
-        newaddition = """
         if writer:
             # Add results to SummaryWriter
             writer.add_scalars(main_tag="Loss", 
@@ -188,6 +189,6 @@ def train(model: torch.nn.Module,
         else:
             pass
     ### End new ###
-    """
+
     # Return the filled results at the end of the epochs
     return results
