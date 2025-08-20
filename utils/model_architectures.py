@@ -7,18 +7,18 @@ from torch import nn
 class TinyVGG_1(nn.Module):
     """Creates a smaller version of the VGG-Net architecture.
 
-        (No padding on the convolution)
-        Input       input channels x 28 x 28 
-        #Layer 1    
-            Conv    hidden_channels x 26 x 26
-            Conv    hidden_channels x 24 x 24
-            Pool    hidden_channels x 12 x 12
-        #Layer 2
-            Conv    hidden_channels x 10 x 10
-            Conv    hidden_channels x 8 x 8
-            Pool    hidden_channels x 4 x 4
-        #Layer 3
-            FC (fully-connected)    hidden_channels*4*4 -> output units
+    (No padding on the convolution)
+    Input       input channels x 28 x 28 
+    #Layer 1    
+        Conv    hidden_channels x 26 x 26
+        Conv    hidden_channels x 24 x 24
+        Pool    hidden_channels x 12 x 12
+    #Layer 2
+        Conv    hidden_channels x 10 x 10
+        Conv    hidden_channels x 8 x 8
+        Pool    hidden_channels x 4 x 4
+    #Layer 3
+        FC (fully-connected)    hidden_channels*4*4 -> output units
 
     Args:
     input_shape: An integer indicating the number of color channels of the input.
@@ -84,28 +84,20 @@ class TinyVGG_1(nn.Module):
     #   conv conv pool conv conv pool, try
     #   conv pool conc conv conv pool or smth
 
-# Instead of logging with
-    #runs/timestamp/experiment_name/model_name/extra (Daniel Bourke style)
-#try loggging with
-    #runs/model_name/experiment_name/extra
+
 #experiment_name will be default for the default architecture and something like 'padding 1' or 'dropout' for the 
 #experiments that take a model that has been tested by default and change something other than its architecture 
 #(and hyperparameters like batch size and number of epochs, which will go in extra)
-#And at the same time, create another folder to store additional data about the experiment
-    #runs_metadata/model_name/experiment_name/extra
-    #and inside store a dictionary with all the information
-    #timestamp, model, hyperparameters (epochs, initial hidden channels, batch size), optimizer, loss function, 
-    #dataset... 
 
-#also make a more detailed log of the experiments, which explains every experiment name in more detail. 
+#also make a more detailed log of the experiments, which explains every experiment_name in more detail. 
 
-#TO DO
-    #In helpers create metadata add OPTIMIZER PARAMETERS LIKE LEARNING RATE, MOMENTUM, ...
-    #Create a function to retrieve experiment metadata (needs /model_name/experiment_name/extra)
-    #Finish creating the rest of the utils
+
+#TO DO 
+    #Homogenize documentation (get_data and model_architectures) and add . at the end of args: lines :))))))))
+    #Homogenize typing 
+    #migrate to colab (paths will still work?)
     #Start creating an experimenting pipeline
-    #migrate to colab
-
+    #Experiment with the whole dataloader in GPU if possible
 
 """VGG-Net architecture 
 

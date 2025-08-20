@@ -14,10 +14,9 @@ def get_FashionMNIST(dataset_name="FashionMNIST"):
         The folder structure of a dataset will be ...data/dataset_name/FashionMNIST/raw
 
     Args: 
-        dataset_name: the name of the dataset. 
+        dataset_name: the name the dataset will be saved under. 
     """
-    dataset_name = r'{}'.format(dataset_name)
-    dir = os.path.join(DATA_DIRECTORY,dataset_name)
+    dir = os.path.normpath(os.path.join(DATA_DIRECTORY,dataset_name))
     if os.path.exists(dir):
         print(f"Dataset {dataset_name} already exists, will not rewrite.")
     datasets.FashionMNIST(
@@ -38,4 +37,4 @@ def get_FashionMNIST(dataset_name="FashionMNIST"):
 
 
 if __name__ == "__main__": 
-    get_FashionMNIST()
+    get_FashionMNIST("some spaces are good")
