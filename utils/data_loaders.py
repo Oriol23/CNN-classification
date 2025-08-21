@@ -1,10 +1,7 @@
-"""Creates dataloaders from a torchvision dataset.
-
-The dataset has to be previously downloaded on the /data folder of the project.
-"""
+"""Creates dataloaders from a torchvision dataset. """
 import os
 import sys
-import torch 
+from torch import float32
 from torchvision import datasets
 from torchvision.transforms import v2
 from torch.utils.data import DataLoader
@@ -12,17 +9,20 @@ from torch.utils.data import DataLoader
 from config import DATA_DIRECTORY
 
 simple_transform = v2.Compose([v2.ToImage(), 
-                               v2.ToDtype(torch.float32, scale=True)])
+                               v2.ToDtype(float32, scale=True)])
 
 def create_train_test_dataloaders(dataset_name="FashionMNIST", 
                                   BATCH_SIZE=32, 
                                   transform=None):
     """Creates train and test dataloaders from a torchvision dataset.
         
+    The dataset has to be previously downloaded on the /data folder of the 
+    project.
+    
     Args: 
-        dataset_name: Name of the dataset that will be used
-        BATCH_SIZE: Batch size of the dataloader
-        transform: Transformation applied to the train dataloader. 
+        dataset_name: Name of the dataset used to create the dataloader.
+        BATCH_SIZE: Batch size of the dataloader.
+        transform: Transformation applied to the train dataloader.
             Transformation to tensor is already included.
     """                             
     
@@ -62,6 +62,6 @@ def create_train_test_dataloaders(dataset_name="FashionMNIST",
         sys.exit(1)
 
 
-if __name__ == "__main__": 
-    train,test = create_train_test_dataloaders("some spaces are good") 
-    print(len(train))
+#if __name__ == "__main__": 
+#    train,test = create_train_test_dataloaders("some spaces are good") 
+#    print(len(train))

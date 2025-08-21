@@ -17,10 +17,7 @@
 
 #next(model.parameters()).is_cuda #check if model on cuda
 
-#Size of a batch in MB
-#batch = torch.randn(16, 3, 224, 224)
-#print('{}MB'.format(batch.nelement() * batch.element_size() / 1024**2))
-#> 9.1875MB
+#tensorboard --logdir=experiment_logs/runs      #To open tensorboard click the link
 
 #Pytorch tensor format is (batch,C,H,W)
 
@@ -51,15 +48,6 @@ def create_writer(model_name: str,
 
     Returns:
         A SummaryWriter() instance, saving to log_dir.
-
-    Example usage:
-        # Create a writer saving to "runs/effnetb2/data_10_percent/5_epochs/"
-        writer = create_writer(model_name="effnetb2",
-                               experiment_name="data_10_percent",
-                               extra="5_epochs")
-        # The above is the same as:
-        writer = SummaryWriter(log_dir="runs/2022-06-04/data_10_percent/effnetb2
-        /5_epochs/")
     """
 
     if extra:
@@ -73,9 +61,7 @@ def create_writer(model_name: str,
     return SummaryWriter(log_dir=log_dir)
 
         
-#others: dict
-#others: Other hyperparameters of the model, as a dictionary. 
-#    For example: {"Conv layers hidden nodes": 120}
+
 def create_experiment_metadata(writer, #tensorboard SummaryWriter()
                                train_dataloader: torch.utils.data.DataLoader,
                                test_dataloader: torch.utils.data.DataLoader,
@@ -84,7 +70,7 @@ def create_experiment_metadata(writer, #tensorboard SummaryWriter()
                                loss_fn: torch.nn.Module,
                                epochs: int,
                                ):
-    """Stores a dictionary containig all the information about an experiment. 
+    """Stores a dictionary containig more information about an experiment. 
     
     When performing an experiment and logging its results on tensorboard, also 
     store a dictionary containing additional information about the experiment, 
@@ -94,20 +80,21 @@ def create_experiment_metadata(writer, #tensorboard SummaryWriter()
     dict_dir follows the same naming convention for folders as the 
     SummaryWriter() log_dir. 
     dict_dir is a combination of /runs_metadata/model_name/experiment_name/extra
+    log_dir is a combination of /runs/model_name/experiment_name/extra
 
     Args:
-        writer: A SummaryWriter() instance
-        train_dataloader: PyTorch dataloader used to train the model
-        test_dataloader: PyTorch dataloader used to test the model
-        model: PyTorch model used
-        optimizer: PyTorch optimizer used
-        loss_fn: PyTorch loss function used        
-        epochs: Number of epochs the model has been trained for
+        writer: A SummaryWriter() instance.
+        train_dataloader: PyTorch dataloader used to train the model.
+        test_dataloader: PyTorch dataloader used to test the model.
+        model: PyTorch model used.
+        optimizer: PyTorch optimizer used.
+        loss_fn: PyTorch loss function used.      
+        epochs: Number of epochs the model has been trained for.
     """
 
     experiment_data = {}
 
-    #relative path of the SummaryWriter() logdir and runs folder, containing
+    #relative path of the SummaryWriter() logdir and the runs folder, containing
     #model_name/experiment_name/extras 
     relpath = os.path.relpath(writer.__getstate__()['log_dir'],
                                                RUNS_DIRECTORY)
@@ -116,7 +103,7 @@ def create_experiment_metadata(writer, #tensorboard SummaryWriter()
     
     model_name = components[0]
     experiment_name = components[1]
-    timestamp = datetime.now().strftime("%d-%m-%Y")
+    timestamp = datetime.now().strftime("%d-%m-%Y %H:%M") #dd-mm-yyyy hour:min
     dataset_name = os.path.split(train_dataloader.dataset.root)[-1]#type: ignore
     trn_dataset_size = len(train_dataloader.dataset)             #type: ignore
     tst_dataset_size = len(test_dataloader.dataset)              #type: ignore
@@ -132,6 +119,7 @@ def create_experiment_metadata(writer, #tensorboard SummaryWriter()
     experiment_data.update({"date": timestamp})
     experiment_data.update({"experiment name": experiment_name})
     experiment_data.update({"model name": model_name})
+    #if the optimizer has learning rate
     try: 
         learning_rate = optimizer.__getstate__()['defaults']['lr']
         experiment_data.update({"learning rate": learning_rate})
@@ -159,7 +147,7 @@ def create_experiment_metadata(writer, #tensorboard SummaryWriter()
     file_path = os.path.join(dict_dir,METADATA_FILENAME)
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'wb') as f:
-        pickle.dump(experiment_data, f)    
+        pickle.dump(experiment_data, f)   
     
     print(f"[INFO] Created experiment metadata, saving to: {dict_dir}...")
 
@@ -181,12 +169,14 @@ def retrieve_metadata(model_name:str, experiment_name:str, extra=None):
     Returns: 
         A dictionary. 
     """
+    
     if extra:
         metadata_path = os.path.join(RUNS_METADATA_DIRECTORY, model_name, 
                                experiment_name, extra, METADATA_FILENAME)
     else:
         metadata_path = os.path.join(RUNS_METADATA_DIRECTORY, model_name, 
                                experiment_name, METADATA_FILENAME)
+    
     if os.path.exists(metadata_path):
         with open(metadata_path, 'rb') as file:
             metadata = pickle.load(file)

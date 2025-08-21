@@ -1,4 +1,4 @@
-"""Contains different model architectures for image classification as torch.nn.Module."""
+"""Contains model architectures for image classification as torch.nn.Module."""
 
 import torch
 from torch import nn 
@@ -18,12 +18,14 @@ class TinyVGG_1(nn.Module):
         Conv    hidden_channels x 8 x 8
         Pool    hidden_channels x 4 x 4
     #Layer 3
-        FC (fully-connected)    hidden_channels*4*4 -> output units
+        FC (fully-connected)    hidden_channels*4*4 -> output_shape
 
     Args:
-    input_shape: An integer indicating the number of color channels of the input.
-    hidden_channels: An integer indicating the number of channels between layers.
-    output_shape: An integer indicating the number of output units (equals number of classes).
+        input_shape: An integer indicating the number of channels of the input.
+        hidden_channels: An integer indicating the number of channels between 
+            layers.
+        output_shape: An integer indicating the number of output units.
+            Equals number of classes.
     """
     def __init__(self, input_shape: int, hidden_channels: int, output_shape: int) -> None:
         super().__init__()
@@ -93,8 +95,8 @@ class TinyVGG_1(nn.Module):
 
 
 #TO DO 
-    #Homogenize documentation (get_data and model_architectures) and add . at the end of args: lines :))))))))
-    #Homogenize typing 
+    #Homogenize typing
+    #Put runs and runs_metadata into an experiment_logging folder and see if paths still work
     #migrate to colab (paths will still work?)
     #Start creating an experimenting pipeline
     #Experiment with the whole dataloader in GPU if possible

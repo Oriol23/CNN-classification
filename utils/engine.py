@@ -120,7 +120,7 @@ def train(model: torch.nn.Module,
         model: A PyTorch model to be trained and tested.
         train_dataloader: A DataLoader instance for the model to be trained on.
         test_dataloader: A DataLoader instance for the model to be tested on.
-        optimizer: A PyTorch optimizer to help minimize the loss function.
+        optimizer: A PyTorch optimizer to minimize the loss function.
         loss_fn: A PyTorch loss function to calculate loss on both datasets.
         epochs: An integer indicating how many epochs to train for.
         writer: A SummaryWriter() instance to log model results to.
@@ -164,6 +164,7 @@ def train(model: torch.nn.Module,
                                global_step=epoch)
 
             # Close the writer
+            writer.flush()
             writer.close()
         else:
             pass
