@@ -47,11 +47,8 @@ def train_step(model: torch.nn.Module,
         train_acc += (y==y_pred.argmax(dim=1)).sum().item()/len(y)        
     # Average accuracy
     train_acc /= len(dataloader)
-    
-    #train_loss /= len(dataloader) 
-    #Loss is additive across batches, accuracy is not
-    #Final result will only be multiplied by 32 so nbd
-    
+    train_loss /= len(dataloader) 
+
     #print(f"Train loss: {train_loss:.4f} | Train acc: {100*train_acc:.0f}%")
     return train_loss, train_acc
 
@@ -88,10 +85,8 @@ def test_step(model: torch.nn.Module,
             test_acc += (y==y_pred.argmax(dim=1)).sum().item()/len(y) 
                     #y is (batch_size) and y_pred is (batch_size,n_classes)
         test_acc /= len(dataloader)
-        
-        #test_loss /= len(dataloader)
-        #Loss is additive across batches, accuracy is not
-        #Final result will only be multiplied by 32 so nbd
+        test_loss /= len(dataloader)
+
 
     #print(f"Test loss: {test_loss:.4f} | Test acc: {100*test_acc:.0f}%")
     return test_loss, test_acc
