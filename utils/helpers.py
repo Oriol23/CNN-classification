@@ -28,10 +28,10 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import pickle 
 
-from config import RUNS_DIRECTORY
-from config import RUNS_METADATA_DIRECTORY
-from config import METADATA_FILENAME
-from config import MODELS_DIRECTORY
+from utils.config import RUNS_DIRECTORY
+from utils.config import RUNS_METADATA_DIRECTORY
+from utils.config import METADATA_FILENAME
+from utils.config import MODELS_DIRECTORY
 
 def create_writer(model_name: str,
                   experiment_name: str, 

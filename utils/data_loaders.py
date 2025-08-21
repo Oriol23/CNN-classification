@@ -6,7 +6,7 @@ from torchvision import datasets
 from torchvision.transforms import v2
 from torch.utils.data import DataLoader
 
-from config import DATA_DIRECTORY
+from utils.config import DATA_DIRECTORY
 
 simple_transform = v2.Compose([v2.ToImage(), 
                                v2.ToDtype(float32, scale=True)])

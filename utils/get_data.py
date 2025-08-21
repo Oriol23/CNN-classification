@@ -6,7 +6,7 @@ from torch import float32
 from torchvision import datasets
 from torchvision.transforms import v2
 
-from config import DATA_DIRECTORY
+from utils.config import DATA_DIRECTORY
 
 def get_FashionMNIST(dataset_name="FashionMNIST"):
     """Downloads the PyTorch FashionMNIST dataset into the /data folder.

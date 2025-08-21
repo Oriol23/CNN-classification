@@ -3,7 +3,7 @@ import torch
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
 #from torch.utils.tensorboard import SummaryWriter
-from helpers import create_experiment_metadata
+from utils.helpers import create_experiment_metadata
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
