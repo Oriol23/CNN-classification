@@ -13,7 +13,8 @@ simple_transform = v2.Compose([v2.ToImage(),
 
 def create_train_test_dataloaders(dataset_name="FashionMNIST", 
                                   BATCH_SIZE=32, 
-                                  transform=None):
+                                  transform=None,
+                                  size=1.0):
     """Creates train and test dataloaders from a torchvision dataset.
         
     The dataset has to be previously downloaded on the /data folder of the 
@@ -24,6 +25,8 @@ def create_train_test_dataloaders(dataset_name="FashionMNIST",
         BATCH_SIZE: Batch size of the dataloader.
         transform: Transformation applied to the train dataloader.
             Transformation to tensor is already included.
+        size: Fraction of the dataset used to create the dataloader. 
+            Float from 0 (0%) to 1 (100%).
     """                             
     
     dataset_dir = os.path.normpath(os.path.join(DATA_DIRECTORY,dataset_name))
@@ -47,6 +50,11 @@ def create_train_test_dataloaders(dataset_name="FashionMNIST",
             target_transform=None
             )
 
+        #Use a subset of the dataset if specified
+        train_nels = int(len(train_data)*size)
+        train_data.data = train_data.data[0:train_nels]
+        test_data.data = test_data.data[0:train_nels]
+
         train_dataloader = DataLoader(dataset=train_data, 
                                     batch_size=BATCH_SIZE,
                                     shuffle=True
@@ -57,9 +65,8 @@ def create_train_test_dataloaders(dataset_name="FashionMNIST",
                                     ) 
         return train_dataloader,test_dataloader
     except RuntimeError: #RuntimeError when PyTorch cannot find the dataset
-        print(f"\n The dataset '{dataset_name}' does not correspond to "
-              "any dataset.\n")
-        sys.exit(1)
+        print(f"[ERROR] The dataset '{dataset_name}' does not correspond to "
+              "any dataset.")
 
 
 #if __name__ == "__main__": 
