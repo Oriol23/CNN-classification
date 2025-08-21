@@ -30,8 +30,8 @@ import pickle
 
 from config import RUNS_DIRECTORY
 from config import RUNS_METADATA_DIRECTORY
-from utils.config import METADATA_FILENAME
-
+from config import METADATA_FILENAME
+from config import MODELS_DIRECTORY
 
 def create_writer(model_name: str,
                   experiment_name: str, 
@@ -62,7 +62,7 @@ def create_writer(model_name: str,
 
         
 
-def create_experiment_metadata(writer, #tensorboard SummaryWriter()
+def create_experiment_metadata(writer,
                                train_dataloader: torch.utils.data.DataLoader,
                                test_dataloader: torch.utils.data.DataLoader,
                                model: torch.nn.Module,
@@ -201,3 +201,41 @@ def dataloader_memory(dataloader):
         f'The size of the train/test dataset is {size*nbat:.3f} MB')
     
 
+#from pathlib import Path
+
+def save_model(model: torch.nn.Module,
+                model_name: str,
+                overwrite=False):
+    """Saves a PyTorch model to the project's models directory.
+
+    Args:
+        model: A target PyTorch model to save.
+        model_name: A filename for the saved model. Should include
+            either ".pth" or ".pt" as the file extension.
+        overwrite: A boolean indicating whether or not an existing file is 
+            overwritten. Defaults to False.
+    
+    Example usage:
+        save_model(model=model_0,
+                    model_name="05_going_modular_tingvgg_model.pth")
+    """
+    #create models directory if it doesn't exist
+    os.makedirs(os.path.dirname(MODELS_DIRECTORY), exist_ok=True)
+
+    #assert model_name.endswith(".pth") or model_name.endswith(".pt"), "model_name should end with '.pt' or '.pth'"
+    if not (model_name.endswith(".pth") or model_name.endswith(".pt")):
+        print("model_name should end with '.pt' or '.pth', not saving.")
+        return
+    
+    # Create model save path    
+    model_save_path = os.path.join(MODELS_DIRECTORY,model_name)
+    
+    if os.path.exists(model_save_path) and not overwrite: #exists no overwrite -> not saving
+        print(f"[INFO] A model already exists at: {model_save_path}, not overwriting.")
+    elif os.path.exists(model_save_path) and overwrite: #exists and overwrite -> overwrites
+        print(f"[INFO] Overwriting model {model_name} at {model_save_path}")
+    else:
+        # Save the model state_dict()
+        torch.save(obj=model.state_dict(),
+                    f=model_save_path)    
+        print(f"[INFO] Saving model to: {model_save_path}")

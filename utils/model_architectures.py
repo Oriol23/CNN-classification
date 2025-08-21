@@ -96,7 +96,6 @@ class TinyVGG_1(nn.Module):
 
 #TO DO 
     #Homogenize typing
-    #Put runs and runs_metadata into an experiment_logging folder and see if paths still work
     #migrate to colab (paths will still work?)
     #Start creating an experimenting pipeline
     #Experiment with the whole dataloader in GPU if possible
