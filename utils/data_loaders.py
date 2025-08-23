@@ -53,7 +53,8 @@ def create_train_test_dataloaders(dataset_name="FashionMNIST",
         #Use a subset of the dataset if specified
         train_nels = int(len(train_data)*size)
         train_data.data = train_data.data[0:train_nels]
-        test_data.data = test_data.data[0:train_nels]
+        test_nels = int(len(test_data)*size)
+        test_data.data = test_data.data[0:test_nels]
 
         train_dataloader = DataLoader(dataset=train_data, 
                                     batch_size=BATCH_SIZE,

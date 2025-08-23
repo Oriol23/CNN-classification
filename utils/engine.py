@@ -121,6 +121,14 @@ def train(model: torch.nn.Module,
         writer: A SummaryWriter() instance to log model results to.
         device: A target device to compute on (e.g. "cuda" or "cpu").
     """
+    # Create empty results dictionary
+    results = {"train_loss": [],
+               "train_acc": [],
+               "test_loss": [],
+               "test_acc": [],
+               "Epoch #": []
+    }
+
     #Store additional data on the experiment if there is a writer
     if writer:
         create_experiment_metadata(writer=writer,
@@ -144,6 +152,12 @@ def train(model: torch.nn.Module,
                                         dataloader=test_dataloader,
                                         loss_fn=loss_fn,
                                         device=device)
+        # Update results dictionary
+        results["train_loss"].append(train_loss)
+        results["train_acc"].append(train_acc)
+        results["test_loss"].append(test_loss)
+        results["test_acc"].append(test_acc)
+        results["Epoch #"].append(epoch)
 
         ### Use the writer parameter to track experiments ###
         # See if there's a writer, if so, log to it
@@ -163,3 +177,5 @@ def train(model: torch.nn.Module,
             writer.close()
         else:
             pass
+    # Return the filled results at the end of the epochs
+    return results

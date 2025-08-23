@@ -1,3 +1,4 @@
+"""Contains functions for miscellaneous tasks and saving models and results. """
 # The .py files in the utils folders will be
 
 #get data -> downloads a dataset
@@ -27,11 +28,14 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 import pickle 
+from typing import Dict
+import pandas as pd
 
 from utils.config import RUNS_DIRECTORY
 from utils.config import RUNS_METADATA_DIRECTORY
 from utils.config import METADATA_FILENAME
 from utils.config import MODELS_DIRECTORY
+from utils.config import RESULTS_DIRECTORY
 
 def create_writer(model_name: str,
                   experiment_name: str, 
@@ -239,3 +243,127 @@ def save_model(model: torch.nn.Module,
         torch.save(obj=model.state_dict(),
                     f=model_save_path)    
         print(f"[INFO] Saving model to: {model_save_path}")
+
+def flatten(mixed_list):
+    """Flattens a list that contains numbers and other lists.
+    
+    Args: 
+        mixed_list: A list containing numbers and lists.
+    
+    Returns: 
+        A list of all the elements.
+    """
+    flattened_list = []
+    for elem in mixed_list:
+        if isinstance(elem,list):
+            for el in elem:
+                flattened_list.append(el)
+        else:
+            flattened_list.append(elem)
+    return flattened_list
+    
+
+def combine_lists(list_1, list_2):
+    """Returns a list of all pairs of elements of list 1 and 2.
+    
+    If any of the two lists is empty returns the other. 
+    If any of the elements of the list is another list, it flattens it. 
+
+    Args: 
+        list_1: List number one.
+        list_2: List number two.
+    
+    Returns: 
+        A list of lists. 
+    """
+    if list_1 == []:
+        return list_2
+    if list_2 == []:
+        return list_1
+    
+    list_combinations = []
+    for el_1 in list_1:
+        for el_2 in list_2:
+            if isinstance(el_1, list) or isinstance(el_2, list):
+                list_combinations.append(flatten([el_1,el_2]))
+            else:
+                list_combinations.append([el_1,el_2])
+    return list_combinations
+
+def hyperparameter_combinations(hyperparams: Dict[str,list]):
+    """Returns all possible combinations of hyperparameters.
+    
+    Args: 
+        hyperparams: A dictionary containing the hyperparameters.
+            The key must be a string and the value a list.  
+    
+    For example: 
+        HYPERPARAMETERS = {'Hidden Channels': [20,40,60,80,100],
+                            'Epochs': [10,20,30],
+                            'lr': [0.1,0.01,0.001] } 
+                            
+    Returns: 
+        A list of tuples of all possible combinations, e.g 
+        [(20,10,0.1),(20,10,0.01),...,(100,30,0.001)]
+    """
+
+    hyperparams_list = []
+    hyperparams_combinations = []
+    tuple_combinations = []
+
+    for key in hyperparams.keys():
+        hyperparams_list.append(hyperparams[key])
+    
+    for hplist in hyperparams_list:
+        hyperparams_combinations = combine_lists(hyperparams_combinations,hplist)
+
+    for combination in hyperparams_combinations:
+        tuple_combinations.append(tuple(combination))
+    
+    return tuple_combinations
+
+
+def create_dataframe(results,hyperparameters_tuple,hyperparameters_keys):
+    """Creates a pandas dataframe with the results of an experiment.
+    
+    Args: 
+        results: A dictionary with the accuracy and loss results.
+            Obtained with the train function.
+        hyperparameters_tuple: A tuple with the values of the hyperparameters 
+            used in the experiment.
+        hyperparameters_keys: The keys of the hyperparameters dictionary used.
+    
+    Returns:
+        A dataframe containing the values of the hyperparameters and the 
+        accuracy and loss for every epoch of an experiment. 
+    """
+    dict_to_df = {}
+    #Accesses the first value and sees the number of datapoints
+    n_datapoints = len(results[next(iter(results.keys()))])
+    #Stores the hyperparameters 
+    for m,key in enumerate(hyperparameters_keys):
+        dict_to_df.update({key:[hyperparameters_tuple[m]]*n_datapoints})
+    #Stores the results
+    dict_to_df.update(results) 
+
+    resdf = pd.DataFrame(dict_to_df)
+
+    return resdf
+
+def save_dataframe(df,model_name,experiment_name,extra):
+    """Saves a dataframe in the Feather format. 
+    
+    The path to save it is 
+    experiment_logs/results/model_name_experiment_name_extra.feather
+    
+    Args: 
+        df: A pandas dataframe to be saved.
+        model_name: Name of the model used
+        experiment_name: Name of the experiment
+        extra: Anything extra to add.
+    """
+    filename = model_name+"_"+experiment_name+"_"+extra+".feather"
+    dataframe_path = os.path.join(RESULTS_DIRECTORY,filename)
+    os.makedirs(os.path.dirname(dataframe_path), exist_ok=True)
+    df.to_feather(dataframe_path)
+    print(f"[INFO] Saving the above results to: {dataframe_path}")

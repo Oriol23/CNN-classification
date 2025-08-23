@@ -9,3 +9,4 @@ RUNS_DIRECTORY = os.path.join(MAIN_DIRECTORY,"experiment_logs","runs")
 RUNS_METADATA_DIRECTORY = os.path.join(MAIN_DIRECTORY,"experiment_logs",
                                        "runs_metadata")
 METADATA_FILENAME = "Metadata.pkl"
+RESULTS_DIRECTORY = os.path.join(MAIN_DIRECTORY,"experiment_logs","results")
