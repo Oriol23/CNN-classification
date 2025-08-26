@@ -32,21 +32,22 @@ from typing import Dict
 import pandas as pd
 
 from utils.config import RUNS_DIRECTORY
-from utils.config import RUNS_METADATA_DIRECTORY
 from utils.config import METADATA_FILENAME
 from utils.config import MODELS_DIRECTORY
 from utils.config import RESULTS_DIRECTORY
+from utils.config import RESULTS_FILENAME
 
-def create_writer(model_name: str,
-                  experiment_name: str, 
+def create_writer(experiment_name: str,
+                  model_name: str, 
                   extra=None):
     """Creates a SummaryWriter() saving to a specific directory log_dir.
 
-    log_dir is a combination of /runs/model_name/experiment_name/extra.
+    log_dir is a combination of 
+    experiment_logs/runs/experiment_name/model_name/extra.
 
-    Args:
-        model_name: Name of the model used on the experiment.
+    Args:        
         experiment_name: Name of the experiment.
+        model_name: Name of the model used on the experiment.
         extra (optional): Anything extra to add to the directory. 
             Defaults to None.
 
@@ -55,26 +56,26 @@ def create_writer(model_name: str,
     """
 
     if extra:
-        log_dir = os.path.join(RUNS_DIRECTORY, model_name, 
-                               experiment_name, extra)
+        log_dir = os.path.join(RUNS_DIRECTORY, experiment_name, model_name, 
+                               extra)
     else:
-        log_dir = os.path.join(RUNS_DIRECTORY, model_name, 
-                               experiment_name)
+        log_dir = os.path.join(RUNS_DIRECTORY, experiment_name, model_name)
 
     print(f"[INFO] Created SummaryWriter, saving to: {log_dir}...")
     return SummaryWriter(log_dir=log_dir)
 
-        
 
-def create_experiment_metadata(writer,
-                               train_dataloader: torch.utils.data.DataLoader,
-                               test_dataloader: torch.utils.data.DataLoader,
-                               model: torch.nn.Module,
-                               optimizer: torch.optim.Optimizer,
-                               loss_fn: torch.nn.Module,
-                               epochs: int,
-                               ):
-    """Stores a dictionary containig more information about an experiment. 
+def create_and_save_experiment_metadata(experiment_name: str,
+                                model_name: str, 
+                                extra:str,
+                                train_dataloader: torch.utils.data.DataLoader,
+                                test_dataloader: torch.utils.data.DataLoader,
+                                model: torch.nn.Module,
+                                optimizer: torch.optim.Optimizer,
+                                loss_fn: torch.nn.Module,
+                                epochs: int,
+                                ):
+    """Creates and saves a dictionary containig information about an experiment. 
     
     When performing an experiment and logging its results on tensorboard, also 
     store a dictionary containing additional information about the experiment, 
@@ -83,8 +84,10 @@ def create_experiment_metadata(writer,
 
     dict_dir follows the same naming convention for folders as the 
     SummaryWriter() log_dir. 
-    dict_dir is a combination of /runs_metadata/model_name/experiment_name/extra
-    log_dir is a combination of /runs/model_name/experiment_name/extra
+    dict_dir is a combination of 
+    experiment_logs/results/experiment_name/model_name/extra
+    log_dir is a combination of 
+    experiment_logs/runs/experiment_name/model_name/extra
 
     Args:
         writer: A SummaryWriter() instance.
@@ -97,16 +100,17 @@ def create_experiment_metadata(writer,
     """
 
     experiment_data = {}
-
+    
     #relative path of the SummaryWriter() logdir and the runs folder, containing
     #model_name/experiment_name/extras 
-    relpath = os.path.relpath(writer.__getstate__()['log_dir'],
-                                               RUNS_DIRECTORY)
+    #relpath = os.path.relpath(writer.__getstate__()['log_dir'],
+    #                                           RUNS_DIRECTORY)
     #[model_name, experiment_name, extras (if present)]
-    components = relpath.split(os.sep) 
+    #components = relpath.split(os.sep) 
     
-    model_name = components[0]
-    experiment_name = components[1]
+    #model_name = components[0]
+    #experiment_name = components[1]
+
     timestamp = datetime.now().strftime("%d-%m-%Y %H:%M") #dd-mm-yyyy hour:min
     dataset_name = os.path.split(train_dataloader.dataset.root)[-1]#type: ignore
     trn_dataset_size = len(train_dataloader.dataset)             #type: ignore
@@ -145,9 +149,14 @@ def create_experiment_metadata(writer,
     experiment_data.update({"model params": model.__getstate__()['_modules']})
     #experiment_data.update(others)
 
-    #Storing the data as a pickle file
-    dict_dir = os.path.join(RUNS_METADATA_DIRECTORY,relpath)
 
+    #Storing the data as a pickle file
+    if extra:
+        dict_dir = os.path.join(RESULTS_DIRECTORY,experiment_name,model_name,
+                                extra)
+    else:
+        dict_dir = os.path.join(RESULTS_DIRECTORY,experiment_name,model_name)
+    
     file_path = os.path.join(dict_dir,METADATA_FILENAME)
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'wb') as f:
@@ -156,18 +165,16 @@ def create_experiment_metadata(writer,
     print(f"[INFO] Created experiment metadata, saving to: {dict_dir}...")
 
 
-
-
-def retrieve_metadata(model_name:str, experiment_name:str, extra=None):
-    """Loads a pickle object containing information about an experiment.
+def retrieve_metadata(experiment_name:str,model_name:str,extra=None):
+    """Loads a pickle file containing information about an experiment.
     
     Loads a dictionary containing extra information on an experiment that has
-    been saved with the function create_experiment_metadata(). See documentation
-    for more information on the file path structure used. 
+    been saved with the function create_and_save_experiment_metadata(). 
+    See its documentation for more information on the file path structure used. 
     
-    Args: 
-        model_name: Name of the model used.
+    Args:         
         experiment_name: Name of the experiment.
+        model_name: Name of the model used.
         extra (optional): Anything extra to add. Defaults to None.
     
     Returns: 
@@ -175,11 +182,11 @@ def retrieve_metadata(model_name:str, experiment_name:str, extra=None):
     """
     
     if extra:
-        metadata_path = os.path.join(RUNS_METADATA_DIRECTORY, model_name, 
-                               experiment_name, extra, METADATA_FILENAME)
+        metadata_path = os.path.join(RESULTS_DIRECTORY, experiment_name,
+                                     model_name, extra, METADATA_FILENAME)
     else:
-        metadata_path = os.path.join(RUNS_METADATA_DIRECTORY, model_name, 
-                               experiment_name, METADATA_FILENAME)
+        metadata_path = os.path.join(RESULTS_DIRECTORY, experiment_name, 
+                                     model_name, METADATA_FILENAME)
     
     if os.path.exists(metadata_path):
         with open(metadata_path, 'rb') as file:
@@ -204,8 +211,6 @@ def dataloader_memory(dataloader):
     print(f'The size of a batch is {size:.3f} MB \n'
         f'The size of the train/test dataset is {size*nbat:.3f} MB')
     
-
-#from pathlib import Path
 
 def save_model(model: torch.nn.Module,
                 model_name: str,
@@ -243,6 +248,7 @@ def save_model(model: torch.nn.Module,
         torch.save(obj=model.state_dict(),
                     f=model_save_path)    
         print(f"[INFO] Saving model to: {model_save_path}")
+
 
 def flatten(mixed_list):
     """Flattens a list that contains numbers and other lists.
@@ -289,6 +295,7 @@ def combine_lists(list_1, list_2):
             else:
                 list_combinations.append([el_1,el_2])
     return list_combinations
+
 
 def hyperparameter_combinations(hyperparams: Dict[str,list]):
     """Returns all possible combinations of hyperparameters.
@@ -340,7 +347,7 @@ def create_dataframe(results,hyperparameters_tuple,hyperparameters_keys):
     dict_to_df = {}
     #Accesses the first value and sees the number of datapoints
     n_datapoints = len(results[next(iter(results.keys()))])
-    #Stores the hyperparameters 
+    #Stores the hyperparameters
     for m,key in enumerate(hyperparameters_keys):
         dict_to_df.update({key:[hyperparameters_tuple[m]]*n_datapoints})
     #Stores the results
@@ -350,20 +357,59 @@ def create_dataframe(results,hyperparameters_tuple,hyperparameters_keys):
 
     return resdf
 
-def save_dataframe(df,model_name,experiment_name,extra):
+def save_dataframe(df,experiment_name,model_name,extra=None):
     """Saves a dataframe in the Feather format. 
     
     The path to save it is 
-    experiment_logs/results/model_name_experiment_name_extra.feather
+    experiment_logs/results/experiment_name/model_name/extra
+
+    Which is the same as the metadata dictionary.
     
     Args: 
-        df: A pandas dataframe to be saved.
-        model_name: Name of the model used
+        df: A pandas dataframe to be saved.        
         experiment_name: Name of the experiment
+        model_name: Name of the model used
         extra: Anything extra to add.
     """
-    filename = model_name+"_"+experiment_name+"_"+extra+".feather"
-    dataframe_path = os.path.join(RESULTS_DIRECTORY,filename)
+
+    if extra:
+        dataframe_path = os.path.join(RESULTS_DIRECTORY,experiment_name,
+                                      model_name,extra,RESULTS_FILENAME)
+    else: 
+        dataframe_path = os.path.join(RESULTS_DIRECTORY,experiment_name,
+                                      model_name,RESULTS_FILENAME)
+    
     os.makedirs(os.path.dirname(dataframe_path), exist_ok=True)
     df.to_feather(dataframe_path)
     print(f"[INFO] Saving the above results to: {dataframe_path}")
+
+
+def retrieve_results(experiment_name:str,model_name:str,extra=None) -> pd.DataFrame:
+    """Loads a feather file containing the results of an experiment.
+    
+    Loads a dataframe containing the results of an experiment that has
+    been saved with the function save_dataframe(). See its documentation
+    for more information on the file path structure used. 
+    
+    Args:         
+        experiment_name: Name of the experiment.
+        model_name: Name of the model used.
+        extra (optional): Anything extra to add. Defaults to None.
+    
+    Returns: 
+        A dataframe. 
+    """
+    
+    if extra:
+        dataframe_path = os.path.join(RESULTS_DIRECTORY, experiment_name,
+                                     model_name, extra, RESULTS_FILENAME)
+    else:
+        dataframe_path = os.path.join(RESULTS_DIRECTORY, experiment_name, 
+                                     model_name, RESULTS_FILENAME)
+    
+    if os.path.exists(dataframe_path):
+        results = pd.read_feather(dataframe_path)
+        return results
+    else:
+        print(f"No results stored in {dataframe_path}")
+        return pd.DataFrame()

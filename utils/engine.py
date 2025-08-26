@@ -3,7 +3,6 @@ import torch
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
 #from torch.utils.tensorboard import SummaryWriter
-from utils.helpers import create_experiment_metadata
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -129,18 +128,6 @@ def train(model: torch.nn.Module,
                "Epoch #": []
     }
 
-    #Store additional data on the experiment if there is a writer
-    if writer:
-        create_experiment_metadata(writer=writer,
-                                    train_dataloader=train_dataloader,
-                                    test_dataloader=test_dataloader,
-                                    model=model,
-                                    optimizer=optimizer,
-                                    loss_fn=loss_fn,
-                                    epochs=epochs,
-                                    )
-    else:
-        pass
     # Loop through training and testing steps for a number of epochs
     for epoch in tqdm(range(epochs)):
         train_loss, train_acc = train_step(model=model,
