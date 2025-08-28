@@ -144,7 +144,7 @@ def train(model: torch.nn.Module,
         results["train_acc"].append(train_acc)
         results["test_loss"].append(test_loss)
         results["test_acc"].append(test_acc)
-        results["Epoch #"].append(epoch)
+        results["Epoch #"].append(epoch+1)
 
         ### Use the writer parameter to track experiments ###
         # See if there's a writer, if so, log to it
