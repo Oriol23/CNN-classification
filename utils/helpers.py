@@ -453,7 +453,7 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     color_cycle = itertools.cycle(colors)
 
-    fig,ax = plt.subplots(2,1,figsize=(11,10))
+    fig,ax = plt.subplots(2,1,figsize=(10,10))
 
     ax0 = ax[0].twinx()
     ax0.get_yaxis().set_visible(False)
@@ -463,7 +463,7 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
     ax1.get_xaxis().set_visible(False)
 
     ax[0].set_ylabel("Accuracy")
-    ax[1].set_ylabel("Loss per batch")
+    ax[1].set_ylabel("Average loss per batch")
     ax[0].set_xlabel("Epochs")
     ax[1].set_xlabel("Epochs")
     
