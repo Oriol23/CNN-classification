@@ -34,6 +34,7 @@ from typing import Dict
 from typing import Tuple
 from datetime import datetime
 import matplotlib.pyplot as plt 
+import matplotlib.lines as mlines
 from torch.utils.tensorboard import SummaryWriter
 
 from utils.config import RUNS_DIRECTORY
@@ -452,6 +453,93 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
     names = iter(results["Label"].unique()) # 1 label per feather file
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     color_cycle = itertools.cycle(colors)
+   
+    fig,ax = plt.subplots(2,1,figsize=(10,10),num=" ")
+
+    ax[0].set_ylabel("Accuracy")
+    ax[1].set_ylabel("Average loss per batch")
+    ax[0].set_xlabel("Epochs")
+    ax[1].set_xlabel("Epochs")
+
+    title_acc = "Training and testing accuracy"
+    title_loss = "Training and testing loss"
+    # if the experiment name or model name have been specified they will not 
+    # appear in the label, so we add them to the title
+    if experiment_name and model_name:
+        title_acc += " for experiment "+experiment_name+ " and model "+model_name
+        title_loss += " for experiment "+experiment_name+ " and model "+model_name
+    elif experiment_name:
+        title_acc += " for experiment "+experiment_name
+        title_loss += " for experiment "+experiment_name
+    elif model_name:
+        title_acc += " for model "+model_name
+        title_loss += " for model "+model_name
+
+    ax[0].set_title(title_acc)
+    ax[1].set_title(title_loss)
+
+
+    train0, = ax[0].plot(np.nan,np.nan,'-',label="train",color ='black')
+    test0, = ax[0].plot(np.nan,np.nan,'--',label="test",color='black')
+
+    ttlegend0 = ax[0].legend(handles=[train0,test0],loc=3)# Legend for train test in acc
+
+    ax[0].add_artist(ttlegend0)
+
+    train1, = ax[1].plot(np.nan,np.nan,'-',label="train",color ='black') 
+    test1, = ax[1].plot(np.nan,np.nan,'--',label="test",color='black')
+
+    ttlegend1 = ax[1].legend(handles=[train1,test1],loc=3) # Legend for train test in loss
+
+    ax[1].add_artist(ttlegend1)
+
+    for label in results["Label"].unique():
+        df = results[results["Label"]==label]
+
+        col = next(color_cycle)
+        name = next(names)
+
+        ax[0].plot(df[["Epoch #"]],df[["train_acc"]],'-',color=col,label=name)
+        ax[0].plot(df[["Epoch #"]],df[["test_acc"]],'--',color=col,label=name) 
+
+        ax[1].plot(df[["Epoch #"]],df[["train_loss"]],'-',color=col,label=name)
+        ax[1].plot(df[["Epoch #"]],df[["test_loss"]],'--',color=col,label=name)
+
+    #Dummy legend so it doesn't delete the train test legend
+    ax[0].legend()
+    ax[1].legend()
+    ax[0].legend().set_visible(False)
+    ax[1].legend().set_visible(False)
+
+    def hover(event):
+        if event.inaxes is ax[0]:
+            selected = [line for line in ax[0].get_lines() if line.contains(event)[0]]
+            handle = []
+            if selected != []:
+                handle = [mlines.Line2D([], [], color=sel.get_color(), label=sel.get_label()) for sel in selected]
+                ax[0].legend(loc=2,handles=handle)
+                fig.canvas.draw_idle()
+            if selected == []:
+                ax[0].get_legend().set_visible(False)
+                fig.canvas.draw_idle()
+
+        elif event.inaxes is ax[1]:
+            selected = [line for line in ax[1].get_lines() if line.contains(event)[0]]
+            handle = []
+            if selected != []:
+                handle = [mlines.Line2D([], [], color=sel.get_color(), label=sel.get_label()) for sel in selected]
+                ax[1].legend(loc=2,handles=handle)
+                fig.canvas.draw_idle()
+            if selected == []:
+                ax[1].get_legend().set_visible(False)
+                fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect("motion_notify_event", hover)
+
+    plt.show()
+    oldcode="""names = iter(results["Label"].unique()) # 1 label per feather file
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    color_cycle = itertools.cycle(colors)
 
     fig,ax = plt.subplots(2,1,figsize=(10,10))
 
@@ -509,3 +597,4 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
 
     plt.show()
 
+"""
