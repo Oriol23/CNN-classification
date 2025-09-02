@@ -341,7 +341,7 @@ def create_dataframe(results:Dict,hyperparameters_tuple,hyperparameters_keys):
     for m,key in enumerate(hyperparameters_keys):
         dict_to_df.update({key:[hyperparameters_tuple[m]]*n_datapoints})
     #Stores the results
-    dict_to_df.update(results) 
+    dict_to_df.update(results)
 
     resdf = pd.DataFrame(dict_to_df)
 
@@ -353,7 +353,8 @@ def save_dataframe(df:pd.DataFrame,experiment_name:str,model_name:str,extra:str)
     The path to save it is 
     experiment_logs/results/experiment_name/model_name/extra
 
-    Which is the same as the metadata dictionary.
+    Which is the same as the metadata dictionary. Additionally creates columns
+    to store experiment_name, model_name and extra.
     
     Args: 
         df: A pandas dataframe to be saved.
@@ -362,6 +363,9 @@ def save_dataframe(df:pd.DataFrame,experiment_name:str,model_name:str,extra:str)
         extra: Anything extra to add to the directory, like hyperparameters. 
     """
 
+    df["Experiment_name"] = [experiment_name]*len(df)
+    df["Model_name"] = [model_name]*len(df)
+    df["Extra"] = [extra]*len(df)
 
     dataframe_path = os.path.join(RESULTS_DIRECTORY,experiment_name,
                                       model_name,extra,RESULTS_FILENAME)
@@ -374,14 +378,15 @@ def save_dataframe(df:pd.DataFrame,experiment_name:str,model_name:str,extra:str)
 def retrieve_results(experiment_name=None,model_name=None,extra=None):
     """Loads dataframes containing the results of an experiment.
     
-    Loads a multiple dataframes saved as .feather files containing the results 
+    Loads multiple dataframes saved as .feather files containing the results 
     of experiments that have been saved with the function save_dataframe(). 
     See its documentation for more information on the file path structure used. 
     If any argument is not specified then it will use all possibilities for 
     that argument or combination of them. For example: 
     retrieve_results(experiment_name=Experiment_1) will retrieve all results 
     inside the Experiment_1 folder regardless of model_name and extra. 
-    retrieve_results() will retrieve all results.
+    retrieve_results() will retrieve all results. 
+    Adds a column named ID that stores the number of each dataframe.
     
     Args:         
         experiment_name: Name of the experiment folder.
@@ -390,25 +395,13 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
     Returns: 
         A dataframe. 
     """
-
-    # Handle all the cases of specifying
-        # Try to use glob to get all paths and then read all paths
-        # Get a label for each case
-        # Join the dataframes with the correct join ;)  df = pd.merge(a, b, on='id', how='outer'
-
-    # If an argument has not been specified it has to be added to the label to be able to distinguish them.
-    # If all have been specified the label is still extra. The label can be ("e","me","ee","eme") 
-    # for one, two or three arguments
-    label_type = ""
     if experiment_name is None:
         experiment_name = "*"
-        label_type+="e"
     if model_name is None:
         model_name = "*"
-        label_type+="m"
     if extra is None:
         extra = "*"
-    label_type+="e"
+
     
     list_of_paths = glob.glob(os.path.join(RESULTS_DIRECTORY,experiment_name,model_name,extra,RESULTS_FILENAME))
     if list_of_paths == []:
@@ -416,24 +409,10 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
         return
     
     results = pd.DataFrame()
-    for dataframe_path in list_of_paths:
+    for n,dataframe_path in enumerate(list_of_paths):
         df = pd.read_feather(dataframe_path)
-        foldernames = dataframe_path.split(os.sep)
-        experiment_name = foldernames[-4]
-        model_name = foldernames[-3]
-        extra = foldernames[-2]
-        #Adds a new column with the label of the experiment, used for plotting.
-        
-        if label_type == "e":
-            label = extra
-        if label_type == "me":
-            label = model_name+"_"+extra
-        if label_type == "ee":
-            label = experiment_name+"_"+extra
-        if label_type == "eme":
-            label = experiment_name+"_"+model_name+"_"+extra
-        
-        df["Label"] = [label]*len(df)
+        # Create a unique identifier for each dataframe every time you load them
+        df["ID"] = [n]*len(df)
         # Concatenate the dataframes
         results = pd.concat([results,df],ignore_index=True)
 
@@ -450,16 +429,21 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
             retrieve the results.
     """
 
-    names = iter(results["Label"].unique()) # 1 label per feather file
+    names = iter(results["ID"].unique()) # 1 label per feather file
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     color_cycle = itertools.cycle(colors)
    
     fig,ax = plt.subplots(2,1,figsize=(10,10),num=" ")
 
     ax[0].set_ylabel("Accuracy")
-    ax[1].set_ylabel("Average loss per batch")
     ax[0].set_xlabel("Epochs")
+    ax[0].set_facecolor("#DFE1E3") #Good background color "#DFE1E3"
+    ax[0].grid()
+    
+    ax[1].set_ylabel("Average loss per batch")
     ax[1].set_xlabel("Epochs")
+    ax[1].set_facecolor("#DFE1E3") 
+    ax[1].grid()
 
     title_acc = "Training and testing accuracy"
     title_loss = "Training and testing loss"
@@ -489,12 +473,12 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
     train1, = ax[1].plot(np.nan,np.nan,'-',label="train",color ='black') 
     test1, = ax[1].plot(np.nan,np.nan,'--',label="test",color='black')
 
-    ttlegend1 = ax[1].legend(handles=[train1,test1],loc=3) # Legend for train test in loss
+    ttlegend1 = ax[1].legend(handles=[train1,test1],loc=3) # Legend forg train test in loss
 
     ax[1].add_artist(ttlegend1)
 
-    for label in results["Label"].unique():
-        df = results[results["Label"]==label]
+    for id in results["ID"].unique():
+        df = results[results["ID"]==id]
 
         col = next(color_cycle)
         name = next(names)
@@ -514,7 +498,6 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
     def hover(event):
         if event.inaxes is ax[0]:
             selected = [line for line in ax[0].get_lines() if line.contains(event)[0]]
-            handle = []
             if selected != []:
                 handle = [mlines.Line2D([], [], color=sel.get_color(), label=sel.get_label()) for sel in selected]
                 ax[0].legend(loc=2,handles=handle)
@@ -525,7 +508,6 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
 
         elif event.inaxes is ax[1]:
             selected = [line for line in ax[1].get_lines() if line.contains(event)[0]]
-            handle = []
             if selected != []:
                 handle = [mlines.Line2D([], [], color=sel.get_color(), label=sel.get_label()) for sel in selected]
                 ax[1].legend(loc=2,handles=handle)
@@ -537,64 +519,150 @@ def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
     fig.canvas.mpl_connect("motion_notify_event", hover)
 
     plt.show()
-    oldcode="""names = iter(results["Label"].unique()) # 1 label per feather file
+
+
+
+
+
+
+
+
+
+
+
+def plot_results_upgraded(results:pd.DataFrame,experiment_name=None,model_name=None):
+    """Plots the results obtained with retrieve_results().
+    
+    Args: 
+        results: A dataframe containing the results to plot.
+        experiment_name: Name of the experiment folder. Has to be the same one 
+            used to retrieve the results. 
+        model_name: Name of the model folder. Has to be the same one used to 
+            retrieve the results.
+    """
+
+    #names = iter(results["ID"].unique()) # 1 label per feather file
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     color_cycle = itertools.cycle(colors)
-
-    fig,ax = plt.subplots(2,1,figsize=(10,10))
-
-    ax0 = ax[0].twinx()
-    ax0.get_yaxis().set_visible(False)
-    ax0.get_xaxis().set_visible(False)
-    ax1 = ax[1].twinx()
-    ax1.get_yaxis().set_visible(False)
-    ax1.get_xaxis().set_visible(False)
+   
+    fig,ax = plt.subplots(2,1,figsize=(10,10),num=" ")
 
     ax[0].set_ylabel("Accuracy")
-    ax[1].set_ylabel("Average loss per batch")
     ax[0].set_xlabel("Epochs")
-    ax[1].set_xlabel("Epochs")
+    ax[0].set_facecolor("#E5E7E9") #Good background color "#E5E7E9"
+    ax[0].grid()
     
+    ax[1].set_ylabel("Average loss per batch")
+    ax[1].set_xlabel("Epochs")
+    ax[1].set_facecolor("#E5E7E9") 
+    ax[1].grid()
+
     title_acc = "Training and testing accuracy"
     title_loss = "Training and testing loss"
-    # if the experiment name or model name have been specified they will not 
-    # appear in the label, so we add them to the title
-    if experiment_name and model_name:
-        title_acc += " for experiment "+experiment_name+ " and model "+model_name
-        title_loss += " for experiment "+experiment_name+ " and model "+model_name
-    elif experiment_name:
-        title_acc += " for experiment "+experiment_name
-        title_loss += " for experiment "+experiment_name
-    elif model_name:
-        title_acc += " for model "+model_name
-        title_loss += " for model "+model_name
-    
     ax[0].set_title(title_acc)
     ax[1].set_title(title_loss)
 
-    for label in results["Label"].unique():
-        df = results[results["Label"]==label]
+    train0, = ax[0].plot(np.nan,np.nan,'-',label="train",color ='black')
+    test0, = ax[0].plot(np.nan,np.nan,'--',label="test",color='black')
+
+    ttlegend0 = ax[0].legend(handles=[train0,test0],loc=2,fancybox=True, framealpha=0.7)# Legend for train test in acc
+
+    ax[0].add_artist(ttlegend0)
+
+    train1, = ax[1].plot(np.nan,np.nan,'-',label="train",color ='black') 
+    test1, = ax[1].plot(np.nan,np.nan,'--',label="test",color='black')
+
+    ttlegend1 = ax[1].legend(handles=[train1,test1],loc=2,fancybox=True, framealpha=0.7) # Legend forg train test in loss
+
+    ax[1].add_artist(ttlegend1)
+
+    linesax0 = [] 
+    linesax1 = []
+    names = {}
+
+    for id in results["ID"].unique():
+        df = results[results["ID"]==id]
 
         col = next(color_cycle)
-        name = next(names)
+        #name = next(names)
+        expname = results["Experiment_name"][results["ID"]==id].unique()[0]
+        modname = results["Model_name"][results["ID"]==id].unique()[0]
+        extraname = results["Extra"][results["ID"]==id].unique()[0]
+        name = expname + " " + modname + " " + extraname
+        names.update({name: [expname,modname,extraname]})
 
-        ax[0].plot(df[["Epoch #"]],df[["train_acc"]],'-',color=col,label=name)
-        ax[0].plot(df[["Epoch #"]],df[["test_acc"]],'--',color=col) 
+        line_tr_acc, = ax[0].plot(df[["Epoch #"]],df[["train_acc"]],'-',color=col,label=name)
+        ax[0].plot(df[["Epoch #"]],df[["test_acc"]],'--',color=col,label=name) 
 
-        ax[1].plot(df[["Epoch #"]],df[["train_loss"]],'-',color=col,label=name)
-        ax[1].plot(df[["Epoch #"]],df[["test_loss"]],'--',color=col)
+        line_tr_loss, = ax[1].plot(df[["Epoch #"]],df[["train_loss"]],'-',color=col,label=name)
+        ax[1].plot(df[["Epoch #"]],df[["test_loss"]],'--',color=col,label=name)
+        #saving only the solid lines for the legend
+        linesax0.append(line_tr_acc)
+        linesax1.append(line_tr_loss)
+#####################################################################################
 
+    leg0 = ax[0].legend(handles=linesax0,loc=1,fancybox=True, framealpha=0.7)
+    leg1 = ax[1].legend(handles=linesax1,loc=1,fancybox=True, framealpha=0.7)
+    leg0.set_visible(False)
+    leg1.set_visible(False)
 
-    ax[1].legend(loc=1,fontsize="small",bbox_to_anchor=(1, -0.125)) # Legend for colors in loss
+    ax0annotation = ax[0].annotate(text="",
+                            xy=(2,0.4),
+                            xytext=(0,20),
+                            textcoords="offset pixels", #data
+                            color="#3D3E41", # #3D3E41 font color
+                            ha="center",
+                            bbox={'boxstyle':'round','fc':'w','edgecolor':'w'},
+                            #arrowprops={'arrowstyle':'->'}
+                            )
+    ax0annotation.set_visible(False)
+    
+    ax1annotation = ax[1].annotate(text="",
+                            xy=(0,0),
+                            xytext=(0,20),
+                            textcoords="offset pixels", #data
+                            color="#3D3E41", # #3D3E41 font color
+                            ha="center",
+                            bbox={'boxstyle':'round','fc':'w','edgecolor':'w'},
+                            #arrowprops={'arrowstyle':'->'}
+                            )
+    ax1annotation.set_visible(False)
 
-    ax0.plot(np.nan,np.nan,'-',label="train",color ='black')
-    ax0.plot(np.nan,np.nan,'--',label="test",color='black')
-    ax0.legend(loc=2) # Legend for train test in acc
+    def hover(event):
+        if event.inaxes is ax[0]:
+            selected = [line for line in ax[0].get_lines() if line.contains(event)[0]]
 
-    ax1.plot(np.nan,np.nan,'-',label="train",color ='black') 
-    ax1.plot(np.nan,np.nan,'--',label="test",color='black')
-    ax1.legend(loc=3) # Legend for train test in loss
+            if selected:
+                mouse_position = (event.xdata, event.ydata)
+                ax0annotation.set_visible(True)
+                expn,modn,extn = names[selected[0].get_label()]      
+                ax0annotation.set_text("EXPERIMENT: "+expn+"\n"+"MODEL: "+modn+"\n"+"HP: "+extn)
+                ax0annotation.get_bbox_patch().set_facecolor(selected[0].get_color()+"CC")
+                ax0annotation.get_bbox_patch().set_edgecolor(selected[0].get_color())
+                ax0annotation.xy = mouse_position
+                fig.canvas.draw_idle()
+            else:
+                ax0annotation.set_visible(False)
+                fig.canvas.draw_idle()
+            
+        if event.inaxes is ax[1]:
+            selected = [line for line in ax[1].get_lines() if line.contains(event)[0]]
 
-    plt.show()
+            if selected:
+                mouse_position = (event.xdata, event.ydata)
+                ax1annotation.set_visible(True)         
+                expn,modn,extn = names[selected[0].get_label()]      
+                ax1annotation.set_text("EXPERIMENT: "+expn+"\n"+"MODEL: "+modn+"\n"+"HP: "+extn)          
+                ax1annotation.get_bbox_patch().set_facecolor(selected[0].get_color()+"CC")
+                ax1annotation.get_bbox_patch().set_edgecolor(selected[0].get_color())
+                ax1annotation.xy = mouse_position
+                fig.canvas.draw_idle()
+            else:
+                ax1annotation.set_visible(False)
+                fig.canvas.draw_idle()
 
-"""
+    fig.canvas.mpl_connect("motion_notify_event", hover)
+
+    #plt.show()
+
+    return fig,ax
