@@ -5,8 +5,10 @@ from shiny import reactive
 import plotly.graph_objects as go
 import plotly.colors as pc
 
+import numpy as np
 import itertools
 import sys
+import re
 import os
 
 MAIN_DIRECTORY = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
@@ -106,7 +108,7 @@ with ui.layout_columns(col_widths=(12,12)):
         # Ading a switch to toggle the legend
         with ui.div(style="position: absolute; top: 0.5rem; right: 0.5rem;"):
             ui.input_switch("legend_acc", "Legend", False)
-        #ui.HTML("<p align=right> </p>")
+            #ui.HTML("<p align=right> </p>")
         @render_plotly
         def plot_acc():
             #print("RE-RENDER ACC")
@@ -119,35 +121,67 @@ with ui.layout_columns(col_widths=(12,12)):
             filtered_res = results.query(query)#type:ignore
             fig = go.Figure()
             for id in filtered_res["ID"].unique():
-                df = filtered_res[filtered_res["ID"]==id]
-                expn = df["Experiment_name"].unique()[0]
-                modn = df["Model_name"].unique()[0]
-                extra = df["Extra"].unique()[0]
-                hovertemp = f"<b>Experiment: </b> {expn} <br>"
-                hovertemp += f"<b>Model: </b> {modn} <br>"
-                hovertemp += f"<b>HP: </b> {extra} <br><extra></extra>"
-            #<extra></extra> removes the name of the series from the hover text
-                name = f"{expn} <b>{modn}</b> {extra}"
-                legtitle = "Experiment <b> Model </b> Hyperparameters <br>"
+                df_id = filtered_res[filtered_res["ID"]==id]
+                expn = df_id["Experiment_name"].unique()[0]
+                modn = df_id["Model_name"].unique()[0]
+                extra = df_id["Extra"].unique()[0]
+                #remove iter_n from extra
+                x = re.sub("Iter_[0-9]+","", extra)
+                x = re.sub("_$","", x)
+                x = re.sub("^_","", x)
+                ht_template = f"<b>Experiment: </b> {expn} <br>"
+                ht_template += f"<b>Model: </b> {modn} <br>"
+                legtitle = "Experiment <b> Model </b> Hyperparameters Iteration <br>"
                 color = next(colors)
-                fig.add_trace(go.Scatter(x=df["Epoch #"],
-                                         y=df["train_acc"],
-                                         name=name,
-                                         line={"color":color}))
-                fig.add_trace(go.Scatter(x=df["Epoch #"],
-                                         y=df["test_acc"],
-                                         name="",
-                                         line={"color":color,"dash":"dash"}))
+
+                # Check if an experiment has been repeated for multiple 
+                # iterations. All iterations are plotted the same color
                 
+                try: # Check if a column named Iter # exists
+                    num_iter = df_id["Iter #"].max()
+                    iter_flag = True
+                # The column may exist in the results dataframe but the value 
+                # can be NaN. 
+                    if np.isnan(num_iter): 
+                        num_iter = 1
+                        iter_flag = False
+                    else:
+                        num_iter = int(num_iter)
+                except KeyError:
+                    num_iter = 1
+                    iter_flag = False
+
+                for it in range(num_iter):
+
+                    if iter_flag:
+                        name = f"{expn} <b>{modn}</b> {x} Iter {it+1}"
+                        add=f"<b>HP: </b> {extra} <extra> Iter {it+1} </extra>"
+                        hovertemp = ht_template + add
+                        df = df_id[df_id["Iter #"]==it+1]
+                    else:
+                        name = f"{expn} <b>{modn}</b> {extra}"
+                        add = f"<b>HP: </b> {extra} <br><extra></extra>"
+                        hovertemp = ht_template + add
+                        df = df_id
+
+                    fig.add_trace(go.Scatter(x=df["Epoch #"],
+                                            y=df["train_acc"],
+                                            name=name,
+                                            line={"color":color},
+                                            hovertemplate=hovertemp))
+                    fig.add_trace(go.Scatter(x=df["Epoch #"],
+                                            y=df["test_acc"],
+                                            name="",
+                                            line={"color":color,"dash":"dash"},
+                                            hovertemplate=hovertemp))
+            
                 fig.update_layout(xaxis_title="Epochs",
-                                  yaxis_title="Accuracy",
-                                  showlegend=input.legend_acc(),
-                                  legend_title={"text":legtitle})
+                                yaxis_title="Accuracy",
+                                showlegend=input.legend_acc(),
+                                legend_title={"text":legtitle})
                 
-                hoverlabel = {"font":{"color":"rgba(0,0,0,0.8)"},
-                              "bordercolor":"rgba(0,0,0,0.8)"}
-                fig.update_traces(hovertemplate=hovertemp,hoverlabel=hoverlabel)
-                        # Creating a fake legend for train-test
+
+            # Creating a fake legend for train-test
             fig.add_layout_image(
             dict(
             source=img_source, #105x43 pxls
@@ -183,33 +217,62 @@ with ui.layout_columns(col_widths=(12,12)):
             filtered_res = results.query(query)#type:ignore
             fig = go.Figure()
             for id in filtered_res["ID"].unique():
-                df = filtered_res[filtered_res["ID"]==id]
-                expn = df["Experiment_name"].unique()[0]
-                modn = df["Model_name"].unique()[0]
-                extra = df["Extra"].unique()[0]
-                hovertemp = f"<b>Experiment: </b> {expn} <br>"
-                hovertemp += f"<b>Model: </b> {modn} <br>"
-                hovertemp += f"<b>HP: </b> {extra} <br><extra></extra>"
-                name = f"{expn} <b>{modn}</b> {extra}"
-                legtitle = "Experiment <b> Model </b> Hyperparameters <br>"
+                df_id = filtered_res[filtered_res["ID"]==id]
+                expn = df_id["Experiment_name"].unique()[0]
+                modn = df_id["Model_name"].unique()[0]
+                extra = df_id["Extra"].unique()[0]
+                #remove iter_n from extra
+                x = re.sub("Iter_[0-9]+","", extra)
+                x = re.sub("_$","", x)
+                x = re.sub("^_","", x)
+                ht_template = f"<b>Experiment: </b> {expn} <br>"
+                ht_template += f"<b>Model: </b> {modn} <br>"
+                legtitle = "Experiment <b> Model </b> Hyperparameters Iteration <br>"
                 color = next(colors)
-            #<extra></extra> removes the name of the series from the hover text
-                fig.add_trace(go.Scatter(x=df["Epoch #"],
-                                         y=df["train_loss"],
-                                         name=name,
-                                         line={"color":color}))
-                fig.add_trace(go.Scatter(x=df["Epoch #"],
-                                         y=df["test_loss"],
-                                         name="",
-                                         line={"color":color,"dash":"dash"}))
+
+                # Check if an experiment has been repeated for multiple 
+                # iterations. All iterations are plotted the same color
+
+                try: # Check if a column named Iter # exists
+                    num_iter = df_id["Iter #"].max()
+                    iter_flag = True
+                # The column may exist in the results dataframe but the value 
+                # can be NaN. 
+                    if np.isnan(num_iter): 
+                        num_iter = 1
+                        iter_flag = False
+                    else:
+                        num_iter = int(num_iter)
+                except KeyError:
+                    num_iter = 1
+                    iter_flag = False
+
+                for it in range(num_iter):
+
+                    if iter_flag:
+                        name = f"{expn} <b>{modn}</b> {x} Iter {it+1}"
+                        hovertemp = ht_template + f"<b>HP: </b> {extra} <extra> Iter {it+1} </extra>"
+                        df = df_id[df_id["Iter #"]==it+1]
+                    else:
+                        name = f"{expn} <b>{modn}</b> {extra}"
+                        hovertemp = ht_template + f"<b>HP: </b> {extra} <br><extra></extra>"
+                        df = df_id
+
+                    fig.add_trace(go.Scatter(x=df["Epoch #"],
+                                            y=df["train_loss"],
+                                            name=name,
+                                            line={"color":color},
+                                            hovertemplate=hovertemp))
+                    fig.add_trace(go.Scatter(x=df["Epoch #"],
+                                            y=df["test_loss"],
+                                            name="",
+                                            line={"color":color,"dash":"dash"},
+                                            hovertemplate=hovertemp))
+
                 fig.update_layout(xaxis_title="Epochs",
-                                  yaxis_title="Average loss per batch",
-                                  showlegend=input.legend_loss(),
-                                  legend_title={"text":legtitle})
-                hoverlabel = {"font":{"color":"rgba(0,0,0,0.8)"},
-                              "bordercolor":"rgba(0,0,0,0.8)"}
-                fig.update_traces(hovertemplate=hovertemp,hoverlabel=hoverlabel)
-            
+                                yaxis_title="Average loss per batch",
+                                showlegend=input.legend_loss(),
+                                legend_title={"text":legtitle})            
             # Creating a fake legend for train-test
             fig.add_layout_image(
             dict(

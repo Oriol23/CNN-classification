@@ -97,6 +97,7 @@ def train(model: torch.nn.Module,
           optimizer: torch.optim.Optimizer,
           loss_fn: torch.nn.Module,
           epochs: int, 
+          iters=None,
           writer=None,  
           device=device
           ):
@@ -117,6 +118,8 @@ def train(model: torch.nn.Module,
         optimizer: A PyTorch optimizer to minimize the loss function.
         loss_fn: A PyTorch loss function to calculate loss on both datasets.
         epochs: An integer indicating how many epochs to train for.
+        iters: An integer indicating how many times the experiment is repeated
+            to explore the effects of randomness. 
         writer: A SummaryWriter() instance to log model results to.
         device: A target device to compute on (e.g. "cuda" or "cpu").
     """
@@ -127,42 +130,56 @@ def train(model: torch.nn.Module,
                "test_acc": [],
                "Epoch #": []
     }
+    # if the iters hyperparameter is specified
+    if iters: 
+        results.update({"Iter #": []})
+        iter_flag = True
+    else:
+        iters=1
+        iter_flag=False
+    
+    #Loop through the number of iterations
+    for iter in range(1,iters+1):
+        if iter_flag:
+            print(f"Iteration {iter}")
+        # Loop through training and testing steps for a number of epochs
+        for epoch in tqdm(range(epochs)):
+            train_loss, train_acc = train_step(model=model,
+                                            dataloader=train_dataloader,
+                                            loss_fn=loss_fn,
+                                            optimizer=optimizer,
+                                            device=device)
+            test_loss, test_acc = test_step(model=model,
+                                            dataloader=test_dataloader,
+                                            loss_fn=loss_fn,
+                                            device=device)
+            # Update results dictionary
+            results["train_loss"].append(train_loss)
+            results["train_acc"].append(train_acc)
+            results["test_loss"].append(test_loss)
+            results["test_acc"].append(test_acc)
+            results["Epoch #"].append(int(epoch+1))
+            if iter_flag:
+                results["Iter #"].append(int(iter))
+            ### Use the writer parameter to track experiments ###
+            # See if there's a writer, if so, log to it
+            if writer:
+                # Add results to SummaryWriter
+                writer.add_scalars(main_tag="Loss", 
+                                tag_scalar_dict={"train_loss": train_loss,
+                                                    "test_loss": test_loss},
+                                global_step=epoch)
+                writer.add_scalars(main_tag="Accuracy", 
+                                tag_scalar_dict={"train_acc": train_acc,
+                                                    "test_acc": test_acc}, 
+                                global_step=epoch)
 
-    # Loop through training and testing steps for a number of epochs
-    for epoch in tqdm(range(epochs)):
-        train_loss, train_acc = train_step(model=model,
-                                          dataloader=train_dataloader,
-                                          loss_fn=loss_fn,
-                                          optimizer=optimizer,
-                                          device=device)
-        test_loss, test_acc = test_step(model=model,
-                                        dataloader=test_dataloader,
-                                        loss_fn=loss_fn,
-                                        device=device)
-        # Update results dictionary
-        results["train_loss"].append(train_loss)
-        results["train_acc"].append(train_acc)
-        results["test_loss"].append(test_loss)
-        results["test_acc"].append(test_acc)
-        results["Epoch #"].append(epoch+1)
-
-        ### Use the writer parameter to track experiments ###
-        # See if there's a writer, if so, log to it
-        if writer:
-            # Add results to SummaryWriter
-            writer.add_scalars(main_tag="Loss", 
-                               tag_scalar_dict={"train_loss": train_loss,
-                                                "test_loss": test_loss},
-                               global_step=epoch)
-            writer.add_scalars(main_tag="Accuracy", 
-                               tag_scalar_dict={"train_acc": train_acc,
-                                                "test_acc": test_acc}, 
-                               global_step=epoch)
-
-            # Close the writer
-            writer.flush()
-            writer.close()
-        else:
-            pass
+                # Close the writer
+                writer.flush()
+                writer.close()
+            else:
+                pass
+        #print(f"Iter {iter}")
+        #print(f"Results \n {results}")
     # Return the filled results at the end of the epochs
     return results
