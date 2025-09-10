@@ -1,14 +1,15 @@
-from shiny import App, ui, reactive
 from shinywidgets import output_widget, render_widget
+from shiny import App, ui, reactive
 
 import plotly.graph_objects as go
 import plotly.colors as pc
 
 import numpy as np
+import base64
 import sys
 import re
 import os
-import base64
+
 
 MAIN_DIRECTORY = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 if MAIN_DIRECTORY not in sys.path:
