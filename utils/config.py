@@ -10,3 +10,5 @@ RESULTS_DIRECTORY = os.path.join(MAIN_DIRECTORY,"experiment_logs","results")
 
 METADATA_FILENAME = "Metadata.pkl"      #must be .pkl
 RESULTS_FILENAME = "Results.feather"    #must be .feather
+
+print(f"[INFO] Main directory {MAIN_DIRECTORY}")

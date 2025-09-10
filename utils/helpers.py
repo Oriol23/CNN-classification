@@ -335,7 +335,7 @@ def create_dataframe(results:Dict,hyperparameters_tuple,hyperparameters_keys):
         accuracy and loss for every epoch of an experiment. 
     """
     dict_to_df = {}
-    #Accesses the first value and sees the number of datapoints
+    #Accesses the first column and sees the number of datapoints
     n_datapoints = len(results[next(iter(results.keys()))])
     #Stores the hyperparameters
     for m,key in enumerate(hyperparameters_keys):
@@ -402,7 +402,7 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
     if extra is None:
         extra = "*"
 
-    
+    print(f"[INFO] retrieving results from {RESULTS_DIRECTORY}")
     list_of_paths = glob.glob(os.path.join(RESULTS_DIRECTORY,experiment_name,model_name,extra,RESULTS_FILENAME))
     if list_of_paths == []:
         print(f"[WARNING] The provided folder names '{experiment_name}','{model_name}','{extra}' or its combination are not valid.")
