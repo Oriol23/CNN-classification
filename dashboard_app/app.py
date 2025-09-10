@@ -6,12 +6,10 @@ import plotly.colors as pc
 
 import numpy as np
 import base64
+import json
 import sys
 import re
 import os
-
-import plotly.io as pio
-pio.renderers.default = "notebook_connected"  # or "svg"
 
 MAIN_DIRECTORY = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 if MAIN_DIRECTORY not in sys.path:
@@ -192,7 +190,9 @@ def server(input, output, session):
             sizing="contain", opacity=1.0,
             layer="above"
         ))
-        return go.Figure(fig)
+
+        fig_json = json.loads(fig.to_json())
+        return go.Figure(fig_json)
 
     @output
     @render_widget
@@ -263,7 +263,9 @@ def server(input, output, session):
             sizing="contain", opacity=1.0,
             layer="above"
         ))
-        return go.Figure(fig)
+
+        fig_json = json.loads(fig.to_json())
+        return go.Figure(fig_json)
 
 
 app = App(app_ui, server)
