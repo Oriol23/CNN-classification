@@ -190,7 +190,7 @@ def server(input, output, session):
             sizing="contain", opacity=1.0,
             layer="above"
         ))
-        return fig
+        return go.Figure(fig)
 
     @output
     @render_widget
@@ -261,7 +261,7 @@ def server(input, output, session):
             sizing="contain", opacity=1.0,
             layer="above"
         ))
-        return fig
+        return go.Figure(fig)
 
 
 app = App(app_ui, server)
