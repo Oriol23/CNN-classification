@@ -10,6 +10,8 @@ import sys
 import re
 import os
 
+import plotly.io as pio
+pio.renderers.default = "notebook_connected"  # or "svg"
 
 MAIN_DIRECTORY = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 if MAIN_DIRECTORY not in sys.path:
