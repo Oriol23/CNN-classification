@@ -403,7 +403,8 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
         extra = "*"
 
     print(f"[INFO] retrieving results from {RESULTS_DIRECTORY}")
-    list_of_paths = glob.glob(os.path.join(RESULTS_DIRECTORY,experiment_name,model_name,extra,RESULTS_FILENAME))
+    list_of_paths = glob.glob(os.path.join(RESULTS_DIRECTORY,experiment_name,
+                                           model_name,extra,RESULTS_FILENAME))
     if list_of_paths == []:
         print(f"[WARNING] The provided folder names '{experiment_name}','{model_name}','{extra}' or its combination are not valid.")
         return
@@ -413,8 +414,32 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
         df = pd.read_feather(dataframe_path)
         # Create a unique identifier for each dataframe every time you load them
         df["ID"] = [n]*len(df)
+        
+        # The column order will be set so hyperparameters are always first, 
+        # followed by train_loss and the rest does not really matter
+        # The columns before training_loss are always hyperparameters if the dfs
+        # have not been merged yet
+        new_col = df.columns.to_list() # New columns
+        curr_col = results.columns.to_list() # Current columns
+        # Ordered union of curr_col and new_col
+        all_col = curr_col[:]
+        [all_col.append(el) for el in new_col if el not in curr_col] 
+        # Find the hyperparameter columns of current and new
+        new_hp = new_col[0:new_col.index('train_loss')]
+        if 'train_loss' in curr_col: # In the first iteration results is empty
+            current_hp = curr_col[0:curr_col.index('train_loss')]
+        else:
+            current_hp = []
+        # Ordered union of current_hp and new_hp
+        curr_hp_ordered = current_hp[:]
+        [curr_hp_ordered.append(el) for el in new_hp if el not in current_hp] 
+        # We add the rest of possible new columns
+        all_columns_ordered = curr_hp_ordered[:]
+        [all_columns_ordered.append(el) for el in all_col if el not in curr_hp_ordered]
         # Concatenate the dataframes
         results = pd.concat([results,df],ignore_index=True)
+        # Reorder the columns
+        results = results[all_columns_ordered]
 
     return results
 

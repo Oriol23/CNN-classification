@@ -6,7 +6,6 @@ import plotly.colors as pc
 
 import numpy as np
 import base64
-import json
 import sys
 import re
 import os
@@ -191,8 +190,8 @@ def server(input, output, session):
             layer="above"
         ))
 
-        fig_json = json.loads(fig.to_json())
-        return go.Figure(fig_json)
+        
+        return go.Figure(fig)
 
     @output
     @render_widget
@@ -264,8 +263,8 @@ def server(input, output, session):
             layer="above"
         ))
 
-        fig_json = json.loads(fig.to_json())
-        return go.Figure(fig_json)
+        
+        return go.Figure(fig)
 
 
 app = App(app_ui, server)
