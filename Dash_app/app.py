@@ -1,5 +1,6 @@
-from dash import Dash, dcc, html, Input, Output, callback
+from dash import Dash, dcc, html, Input, Output, State, callback, ALL
 import dash_bootstrap_components as dbc
+from dash.exceptions import PreventUpdate
 
 import plotly.graph_objects as go
 import plotly.colors as pc
@@ -12,11 +13,7 @@ import sys
 import base64
 import dash_daq as daq
 
-
-
-
-
-
+############## Setup ##############
 
 MAIN_DIRECTORY = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 if MAIN_DIRECTORY not in sys.path:
@@ -24,7 +21,7 @@ if MAIN_DIRECTORY not in sys.path:
 
 from utils.helpers import retrieve_results
 
-img_path = os.path.join(MAIN_DIRECTORY,"dashboard_app", "train_test_legend.png")
+img_path = os.path.join(MAIN_DIRECTORY,"dashboard_app","train_test_legend.png")
 with open(img_path, "rb") as f:
     encoded = base64.b64encode(f.read()).decode()
 img_source = "data:image/png;base64," + encoded
@@ -33,31 +30,38 @@ results = retrieve_results()  # type: ignore
 expn_uniq = results["Experiment_name"].unique().tolist() # type:ignore
 modn_uniq = results["Model_name"].unique().tolist() # type:ignore
 
+###################################
 
 
 
+app = Dash(__name__,external_stylesheets=[dbc.themes.BOOTSTRAP],
+           #suppress_callback_exceptions=True
+           )
 
-app = Dash(__name__,external_stylesheets=[dbc.themes.BOOTSTRAP])
-
+# Creating the layout of the app
 app.layout = html.Div(children=[
     # Title
     html.H1(" Experiment Tracking in Dash"),
     
 
-    # Tabs for the exp and model filters and HP filters
+    # Tabs for the exp and model selector and HP filter
     dcc.Tabs(id='tabs', value='tab-1', children=[
         dcc.Tab(label='Select experiments and models', value='tab-1'),
-        dcc.Tab(label='Filter hyperparameters', value='tab-2'),]),
-    html.Div(id='tabs-content',children=html.Div(dbc.Row([
+        dcc.Tab(label='Filter hyperparameters', value='tab-2'),
+        ]),
+    html.Div(id='tabs-content',children=[html.Br(),
+            dbc.Row([dbc.Col("Experiments"),dbc.Col("Models")],style={"marginLeft": "1rem"}),
+            html.Div(dbc.Row([
                     dbc.Col(dcc.Dropdown(id="exp_dropdown",options=expn_uniq, 
                                          value=expn_uniq[0],multi=True)),
                     dbc.Col(dcc.Dropdown(id="mod_dropdown",options=modn_uniq, 
                                          value=modn_uniq[0],multi=True)),
-                    ]))),
+                    ]),style={"marginLeft": "1.5rem",
+                              "marginRight": "1.5rem"})]),
 
-
-    # Row containing the train test legend, plot title and legend toggle
+    # Row with the train test legend, plot title and legend toggle for accuracy
     dbc.Row([
+
         # train test legend image
         dbc.Col(html.Div(html.Img(
             src=img_source,   # place image in assets/ folder
@@ -97,11 +101,14 @@ app.layout = html.Div(children=[
                                 }),
                 width=4)
         ]),
-    dcc.Graph(id="acc_plot"), #will be replaced by the plot acc callback
+    
+    # Accuracy plot
+    dcc.Graph(id="acc_plot"), 
 
 
-    # Row containing the train test legend, plot title and legend toggle
+    #Row with the train test legend, plot title and legend toggle for loss
     dbc.Row([
+
         # train test legend image
         dbc.Col(html.Div(html.Img(
             src=img_source,   # place image in assets/ folder
@@ -141,40 +148,43 @@ app.layout = html.Div(children=[
                                 }),
                 width=4)
         ]),
+
+    # Loss plot
     dcc.Graph(id="loss_plot"),
+    html.Br(),
+    # Components to store the selected models and experiments so they are not 
+    # lost when switching tabs. 
     dcc.Store(id="selected_exps"),
     dcc.Store(id="selected_mods"),
+    dcc.Store(id="HP_filters",data={"0":"Initial"}),
+    dcc.Store(id="HP_names", data={"0":"Initial"}),
+
 ])
 
 
-#Stores chosen experiments
-@callback(Output("selected_exps","data"),
-          Input("exp_dropdown","value"))
-def store_exps(exp_chosen):
-    if isinstance(exp_chosen, str):
-        exp_chosen = [exp_chosen]
-    df = pd.DataFrame(exp_chosen)
-    return df.to_dict()
 
-#Stores chosen models
-@callback(Output("selected_mods","data"),
-          Input("mod_dropdown","value"))
-def store_mods(mod_chosen):
-    if isinstance(mod_chosen, str):
-        mod_chosen = [mod_chosen]
-    df = pd.DataFrame(mod_chosen)
-    return df.to_dict()
 
+############## Callbacks ##############
+
+
+
+# Do a Store for the filtered dataset and use the filtered dataset as input for 
+# The plots. Like this, the filtering process is done only in one place. 
 
 
 
 # Switches between the different tabs
 @callback(Output('tabs-content', 'children'),
             Input('tabs', 'value'),
-            Input("selected_exps","data"),
-            Input("selected_mods","data"),)
-def render_content(tab,exps_dict,mods_dict):
+            State("selected_exps","data"),
+            State("selected_mods","data"),
+            State("HP_filters","data"),
+            prevent_initial_call=True
+            )
+def render_content(tab,exps_dict,mods_dict,hp_filters):
+    #print("SWITCH TABS")
     if tab == 'tab-1':
+        # the try is checking for empty stored models or experiments
         try: 
             exps = [exp for exp in exps_dict["0"].values()]
         except KeyError:
@@ -183,48 +193,143 @@ def render_content(tab,exps_dict,mods_dict):
             mods = [exp for exp in mods_dict["0"].values()]
         except KeyError:
             mods = []
-        return [
-            html.Br(),
-            dbc.Row([dbc.Col("Experiments"),dbc.Col("Models")]),
+        return [html.Br(),
+            dbc.Row([dbc.Col("Experiments"),dbc.Col("Models")],style={"marginLeft": "1rem"}),
             html.Div(dbc.Row([
-                    dbc.Col(dcc.Dropdown(id="exp_dropdown",options=expn_uniq, value=exps,multi=True)),
-                    dbc.Col(dcc.Dropdown(id="mod_dropdown",options=modn_uniq, value=mods,multi=True)),
-                    ]))]
+                    dbc.Col(dcc.Dropdown(id="exp_dropdown",options=expn_uniq, 
+                                         value=exps,multi=True)),
+                    dbc.Col(dcc.Dropdown(id="mod_dropdown",options=modn_uniq, 
+                                         value=mods,multi=True)),
+                    ]),style={"marginLeft": "1.5rem",
+                              "marginRight": "1.5rem"})]
+    
     elif tab == 'tab-2':
-        return [html.Div("Filter Hyperparameters"),html.Br(),
-                html.Div("Add multiple range sliders, one for every "
-                "hyperparameter. Need to think how I select what is a filterable"
-                "HP and what isn't. A hyperparameter is any column before "
-                "train_loss. Work in progress.")]
+        print(f"HP filters in the data {hp_filters}")
+        try: 
+            exps_chosen = [exp for exp in exps_dict["0"].values()]
+        except KeyError:
+            exps_chosen = []
+        try:
+            mods_chosen = [exp for exp in mods_dict["0"].values()]
+        except KeyError:
+            mods_chosen = []
+        query = f"Experiment_name == {exps_chosen} & "
+        query += f"Model_name == {mods_chosen}"
+        filtered_res = results.query(query)  # type: ignore
+        # all columns where the HP values are not all NAN
+        all_columns = [col for col in filtered_res.columns if not filtered_res[col].isnull().all()]
+        # HP are by definition the columns before train_loss
+        if 'train_loss' in all_columns:
+            hp_names = all_columns[0:all_columns.index('train_loss')]
+        else:
+            return html.Div("No experiments or models have been selected.")
+        # Iter will not be filterable
+        if "Iter" in hp_names:
+            hp_names.remove("Iter")
+        centered = {"display": "flex","justifyContent": "center"}
+        names = [html.Div(name,style=centered) for name in hp_names]
+        hp_drop = []
+        
+        # before the HP filters are initialized
+        if hp_filters == {"0":"Initial"}: 
+            for s,hp in enumerate(hp_names):
+                # Possible values for a HP
+                values = filtered_res[hp].unique().tolist()
+                # If the HP has a NAN value anywhere
+                if filtered_res[hp].isnull().any(): 
+                    values_wo_nan = [val for val in values if not np.isnan(val)]
+
+                    values = values_wo_nan[:]+["Not specified"]
+                hp_drop.append(dcc.Dropdown(id={"type": "hp-dropdown", "index": s},
+                                            options=values,
+                                            value=values,
+                                            multi=True))
+            output = [val for pair in zip(names,hp_drop) for val in pair]
+        else: # else use the stored values
+            for s,hp in enumerate(hp_names):
+                                # Possible values for a HP
+                values = filtered_res[hp].unique().tolist()
+                # If the HP has a NAN value anywhere
+                if filtered_res[hp].isnull().any(): 
+                    values_wo_nan = [val for val in values if not np.isnan(val)]
+                    values = values_wo_nan[:]+["Not specified"]
+                
+                hp_drop.append(dcc.Dropdown(id={"type": "hp-dropdown", "index": s},
+                                            options=values,
+                                            value=hp_filters[str(s)],
+                                            multi=True))
+            output = [val for pair in zip(names,hp_drop) for val in pair]
+            
+        return html.Div(children=output,style={"marginLeft": "1.5rem",
+                                               "marginRight": "1.5rem"})
+
+
+
+#Stores chosen experiments
+@callback(Output("selected_exps","data"),
+          Input("exp_dropdown","value"))
+def store_exps(exps_chosen):
+    #print("STORE EXPS")
+    if isinstance(exps_chosen, str):
+        exps_chosen = [exps_chosen]
+    df = pd.DataFrame(exps_chosen)
+    return df.to_dict()
+
+#Stores chosen models
+@callback(Output("selected_mods","data"),
+          Input("mod_dropdown","value"))
+def store_mods(mods_chosen):
+    #print("STORE MODS")
+    if isinstance(mods_chosen, str):
+        mods_chosen = [mods_chosen]
+    df = pd.DataFrame(mods_chosen)
+    return df.to_dict()
+
+# Stores hp filters values
+@callback(Output("HP_filters","data"),
+          Input({"type": "hp-dropdown", "index": ALL},"value"),
+          prevent_initial_call=True
+          )
+def store_hp_filters(values):
+    print("STORE HP FILTERS")
+    if values == []: #when switching tabs the values become []
+        raise PreventUpdate
+    else: 
+        return {str(n):vals for n,vals in enumerate(values)}
 
 
 # Updates available models based on selected experiments
 @callback(Output("mod_dropdown","options"),
+          Output("mod_dropdown","value"),
             Input("exp_dropdown", "value"))
-def update_models(exp_chosen):
+def update_models(exps_chosen):
+    #print("UPDATE MODELS")
     # If only one experiment is selected
-    if isinstance(exp_chosen, str):
-        exp_chosen = [exp_chosen]
-    filtered_exps = results.query(f"Experiment_name == {list(exp_chosen)}")  # type:ignore
-    model_choices = [mod for mod in filtered_exps["Model_name"].unique().tolist()]
-    return model_choices
+    if isinstance(exps_chosen, str):
+        exps_chosen = [exps_chosen]
+    filtered_exps = results.query(f"Experiment_name == {list(exps_chosen)}")     # type:ignore
+    model_choices=[mod for mod in filtered_exps["Model_name"].unique().tolist()]
+    return model_choices,model_choices
 
-
+# Plots accuracy
 @callback(Output(component_id="acc_plot",component_property="figure"),
           Input(component_id="acc_legend_toggle",component_property="on"),
           Input("exp_dropdown", "value"),
-          Input("mod_dropdown", "value"),)
-def plot_acc(acc_legend,exp_chosen,mod_chosen):
+          Input("mod_dropdown", "value"),
+            )
+def plot_acc(acc_legend,exps_chosen,mods_chosen):
+    #print("PLOT ACC")
     color_palette = pc.qualitative.Dark24
     colors = iter(color_palette)
     # Filter the results based on the selected experiments and models
-    if isinstance(exp_chosen, str):
-        exp_chosen = [exp_chosen]    
-    if isinstance(mod_chosen, str):
-        mod_chosen = [mod_chosen]
-    query = f"Experiment_name == {exp_chosen} & "
-    query += f"Model_name == {mod_chosen}"
-    filtered_res = results.query(query)  # type: ignore
+    if isinstance(exps_chosen, str):
+        exps_chosen = [exps_chosen]    
+    if isinstance(mods_chosen, str):
+        mods_chosen = [mods_chosen]
+    query = f"Experiment_name == {exps_chosen} & "
+    query += f"Model_name == {mods_chosen}"
+    filtered_res = results.query(query) # type: ignore
+
     fig = go.Figure()
 
     for id in filtered_res["ID"].unique():
@@ -305,16 +410,17 @@ def plot_acc(acc_legend,exp_chosen,mod_chosen):
           Input(component_id="loss_legend_toggle",component_property="on"),
           Input("exp_dropdown", "value"),
           Input("mod_dropdown", "value"),)
-def plot_loss(loss_legend,exp_chosen,mod_chosen):
+def plot_loss(loss_legend,exps_chosen,mods_chosen):
+    #print("PLOT LOSS")
     color_palette = pc.qualitative.Dark24
     colors = iter(color_palette)
 
-    if isinstance(exp_chosen, str):
-        exp_chosen = [exp_chosen]    
-    if isinstance(mod_chosen, str):
-        mod_chosen = [mod_chosen]
-    query = f"Experiment_name == {exp_chosen} & "
-    query += f"Model_name == {mod_chosen}"
+    if isinstance(exps_chosen, str):
+        exps_chosen = [exps_chosen]    
+    if isinstance(mods_chosen, str):
+        mods_chosen = [mods_chosen]
+    query = f"Experiment_name == {exps_chosen} & "
+    query += f"Model_name == {mods_chosen}"
     filtered_res = results.query(query)  # type: ignore
     fig = go.Figure()
 
@@ -368,18 +474,7 @@ def plot_loss(loss_legend,exp_chosen,mod_chosen):
                             showlegend=loss_legend, 
                             legend_title={"text": legtitle},
                             margin=dict(l=40, r=40, t=5, b=40))
-                            #title = "Training and testing loss",
-                            #title_x=0.5)
 
-    #fig.add_layout_image(dict(
-    #    source=img_source,
-    #    xref="paper", yref="paper",
-    #    x=0.01, y=1.0,
-    #    sizex=1, sizey=0.1,
-    #    xanchor="left", yanchor="bottom",
-    #    sizing="contain", opacity=1.0,
-    #    layer="above"
-    #))    
     return fig
 
 
