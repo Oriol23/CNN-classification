@@ -302,6 +302,8 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
     query += f"Model_name == {mods}"
     filtered_res = results.query(query) # type: ignore
     for val_list, id_dict in zip(hp_values,hp_ids):
+        # Not specified corresponds to nan in HP value, so check for that 
+        # alongside the other specified values
         if "Not specified" in val_list:
             query = f"{id_dict["index"]}.isnull() | {id_dict["index"]} == {val_list} "
             filtered_res = filtered_res.query(query)
@@ -322,7 +324,7 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
         x = re.sub("_$", "", x)
         x = re.sub("^_", "", x)
 
-        ht_template=f"<b>Experiment: </b>{expn}<br><b>Model: </b>{modn}<br>"
+        template=f"<b>Experiment: </b>{expn}<br><b>Model: </b>{modn}<br>"
         legtitle = "Experiment <b> Model </b> Hyperparameters Iteration<br>"
         color = next(colors)
 
@@ -346,21 +348,21 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
         for it in range(num_iter):
             if iter_flag:
                 name = f"{expn} <b>{modn}</b> {x} Iter {it+1}"
-                hovertemp = ht_template + f"<b>HP: </b> {extra} <extra> Iter {it+1} </extra>"
+                hovertemp = template + f"<b>HP: </b>{extra}<extra>Iter {it+1}<br>" 
                 df = df_id[df_id["Iter #"] == it+1]
             else:
                 name = f"{expn} <b>{modn}</b> {extra}"
-                hovertemp = ht_template + f"<b>HP: </b> {extra} <br><extra></extra>"
+                hovertemp = template + f"<b>HP: </b> {extra} <br><extra>"
                 df = df_id
 
             fig.add_trace(go.Scatter(x=df["Epoch #"], y=df["train_acc"],
                                     name=name, 
                                     line={"color": color}, 
-                                    hovertemplate=hovertemp))
+                                    hovertemplate=hovertemp+"%{y:.3f}</extra>"))
             fig.add_trace(go.Scatter(x=df["Epoch #"], y=df["test_acc"],
-                                        name="", 
-                                        line={"color": color, "dash": "dash"}, 
-                                        hovertemplate=hovertemp))
+                                    name="", 
+                                    line={"color": color, "dash": "dash"}, 
+                                    hovertemplate=hovertemp+"%{y:.3f}</extra>"))
 
         fig.update_layout(xaxis_title="Epochs", yaxis_title="Accuracy",
                             showlegend=acc_legend,
@@ -422,7 +424,7 @@ def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
         x = re.sub("_$", "", x)
         x = re.sub("^_", "", x)
 
-        ht_template=f"<b>Experiment: </b>{expn}<br><b>Model: </b>{modn}<br>"
+        template=f"<b>Experiment: </b>{expn}<br><b>Model: </b>{modn}<br>"
         legtitle ="Experiment <b> Model </b> Hyperparameters Iteration <br>"
         color = next(colors)
 
@@ -441,11 +443,11 @@ def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
         for it in range(num_iter):
             if iter_flag:
                 name = f"{expn} <b>{modn}</b> {x} Iter {it+1}"
-                hovertemp = ht_template + f"<b>HP: </b> {extra} <extra> Iter {it+1} </extra>"
+                hovertemp = template + f"<b>HP: </b> {extra} <extra> Iter {it+1} </extra>"
                 df = df_id[df_id["Iter #"] == it+1]
             else:
                 name = f"{expn} <b>{modn}</b> {extra}"
-                hovertemp = ht_template + f"<b>HP: </b> {extra} <br><extra></extra>"
+                hovertemp = template+f"<b>HP: </b> {extra} <br><extra></extra>"
                 df = df_id
 
             fig.add_trace(go.Scatter(x=df["Epoch #"], y=df["train_loss"],

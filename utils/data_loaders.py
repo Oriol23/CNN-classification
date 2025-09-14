@@ -16,7 +16,7 @@ simple_transform = v2.Compose([v2.ToImage(),
 def create_train_test_dataloaders(dataset_name="FashionMNIST", 
                                   BATCH_SIZE=32, 
                                   transform=None,
-                                  size=1.0):
+                                  size=None):
     """Creates train and test dataloaders from a torchvision dataset.
         
     The dataset has to be previously downloaded on the /data folder of the 
@@ -30,6 +30,8 @@ def create_train_test_dataloaders(dataset_name="FashionMNIST",
         size: Fraction of the dataset used to create the dataloader. 
             Float from 0 (0%) to 1 (100%).
     """                             
+    if size == None:
+        size = 1.0
     
     dataset_dir = os.path.normpath(os.path.join(DATA_DIRECTORY,dataset_name))
     if transform == None: 

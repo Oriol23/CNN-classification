@@ -93,10 +93,10 @@ def test_step(model: torch.nn.Module,
     return test_loss, test_acc
 
 
-def train(model: torch.nn.Module, 
+def train(model: torch.nn.Module | List, 
           train_dataloader: torch.utils.data.DataLoader, 
           test_dataloader: torch.utils.data.DataLoader, 
-          optimizer: torch.optim.Optimizer,
+          optimizer: torch.optim.Optimizer | List,
           loss_fn: torch.nn.Module,
           epochs: int, 
           iters=None,
@@ -114,10 +114,12 @@ def train(model: torch.nn.Module,
     Stores metrics to specified writer log_dir if present.
 
     Args:
-        model: A PyTorch model to be trained and tested.
+        model: A PyTorch model to be trained and tested or a list of models for
+            the experiment to be repeated multiple times.
         train_dataloader: A DataLoader instance for the model to be trained on.
         test_dataloader: A DataLoader instance for the model to be tested on.
-        optimizer: A PyTorch optimizer to minimize the loss function.
+        optimizer: A PyTorch optimizer to minimize the loss function or list of
+            optimizers if multiple models have been passed, one for each.
         loss_fn: A PyTorch loss function to calculate loss on both datasets.
         epochs: An integer indicating how many epochs to train for.
         iters: An integer indicating how many times the experiment is repeated
@@ -145,17 +147,24 @@ def train(model: torch.nn.Module,
         iter_flag=False
     
     #Loop through the number of iterations
-    for iter in range(1,iters+1):
+    for iter in range(iters):
+        # if model and optimizer are a single object
+        model_0 = model
+        optimizer_0 = optimizer
+        # If they are a list, iter must have been called in the experiment 
+        # pipeline
         if iter_flag:
-            print(f"Iteration {iter}")
+            print(f"Iteration {iter+1}")
+            model_0 = model[iter] #type:ignore
+            optimizer_0 = optimizer[iter] #type:ignore
         # Loop through training and testing steps for a number of epochs
         for epoch in tqdm(range(epochs)):
-            train_loss, train_acc = train_step(model=model,
+            train_loss, train_acc = train_step(model=model_0, #type:ignore
                                             dataloader=train_dataloader,
                                             loss_fn=loss_fn,
-                                            optimizer=optimizer,
+                                            optimizer=optimizer_0,#type:ignore
                                             device=device)
-            test_loss, test_acc = test_step(model=model,
+            test_loss, test_acc = test_step(model=model_0, #type:ignore
                                             dataloader=test_dataloader,
                                             loss_fn=loss_fn,
                                             device=device)
@@ -166,7 +175,7 @@ def train(model: torch.nn.Module,
             results["test_acc"].append(test_acc)
             results["Epoch #"].append(int(epoch+1))
             if iter_flag:
-                results["Iter #"].append(int(iter))
+                results["Iter #"].append(int(iter+1))
             ### Use the writer parameter to track experiments ###
             # See if there's a writer, if so, log to it
             if writer:
@@ -185,7 +194,5 @@ def train(model: torch.nn.Module,
                 writer.close()
             else:
                 pass
-        #print(f"Iter {iter}")
-        #print(f"Results \n {results}")
     # Return the filled results at the end of the epochs
     return results
