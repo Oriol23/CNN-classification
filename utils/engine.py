@@ -1,8 +1,10 @@
 """Contains functions for training and testing a PyTorch model."""
+
 import torch
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
 #from torch.utils.tensorboard import SummaryWriter
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -122,6 +124,10 @@ def train(model: torch.nn.Module,
             to explore the effects of randomness. 
         writer: A SummaryWriter() instance to log model results to.
         device: A target device to compute on (e.g. "cuda" or "cpu").
+
+    Returns: 
+        A dictionary containing the train loss, train accuracy, test loss and 
+        test accuracy for every epoch and iteration, if the last is specified. 
     """
     # Create empty results dictionary
     results = {"train_loss": [],

@@ -1,4 +1,5 @@
 """Creates dataloaders from a torchvision dataset. """
+
 import os
 import sys
 from torch import float32
@@ -7,6 +8,7 @@ from torchvision.transforms import v2
 from torch.utils.data import DataLoader
 
 from utils.config import DATA_DIRECTORY
+
 
 simple_transform = v2.Compose([v2.ToImage(), 
                                v2.ToDtype(float32, scale=True)])
@@ -68,8 +70,3 @@ def create_train_test_dataloaders(dataset_name="FashionMNIST",
     except RuntimeError: #RuntimeError when PyTorch cannot find the dataset
         print(f"[ERROR] The dataset '{dataset_name}' does not correspond to "
               "any dataset.")
-
-
-#if __name__ == "__main__": 
-#    train,test = create_train_test_dataloaders("some spaces are good") 
-#    print(len(train))

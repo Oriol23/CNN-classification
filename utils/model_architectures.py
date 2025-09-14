@@ -25,7 +25,7 @@ class TinyVGG_1(nn.Module):
         hidden_channels: An integer indicating the number of channels between 
             layers.
         output_shape: An integer indicating the number of output units.
-            Equals number of classes.
+            Equals number of classes. 
     """
     def __init__(self, input_shape: int, hidden_channels: int, output_shape: int) -> None:
         super().__init__()
@@ -87,46 +87,11 @@ class TinyVGG_1(nn.Module):
     #   conv pool conc conv conv pool or smth
 
 
-#experiment_name will be default for the default architecture and something like 'padding 1' or 'dropout' for the 
-#experiments that take a model that has been tested by default and change something other than its architecture 
-#(and hyperparameters like batch size and number of epochs, which will go in extra)
-
-#also make a more detailed log of the experiments, which explains every experiment_name in more detail. 
-
 
 #TO DO 
-    #Homogenize typing
-    #migrate to colab (paths will still work?)
-    #Start creating an experimenting pipeline
     #Experiment with the whole dataloader in GPU if possible
+    #train -> trains a model from the commandline, although I have to figure out how to set hyperparameters, 
+        # model architecture and other things in the input
+    #inference -> uses a trained model to make a prediction on data
+    #also make a more detailed log of the experiments, which explains every experiment_name in more detail. 
 
-"""VGG-Net architecture 
-
-    Input
-    #Layer 1
-        Conv
-        Conv
-        Pool
-    #Layer 2
-        Conv
-        Conv
-        Pool
-    #Layer 3
-        Conv
-        Conv
-        Pool
-    #Layer 4
-        Conv
-        Conv
-        Pool
-    #Layer 5
-        Conv
-        Conv
-        Pool
-    #Layer 6
-        FC
-    #Layer 7
-        FC
-    #Layer 8
-        FC
-    """

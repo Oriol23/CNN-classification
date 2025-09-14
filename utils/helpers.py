@@ -1,27 +1,4 @@
 """Contains functions for miscellaneous tasks and saving models and results. """
-# The .py files in the utils folders will be
-
-#get data -> downloads a dataset
-#data_loaders -> creates dataloaders from a dataset
-#model_architectures -> classes with the model architectures
-#engine -> functions for training and testing models
-            #make a monitored training function that tests loss and acc every epoch and a barebones training
-            #in case tensorboard automatically tracks that, or for the train script. 
-#helpers -> saving and loading a model, creating writers, storing metadata
-#config -> stores variables like the paths to the main project folder and the data folder
-#
-#plots -> plotting results, probably better in a notebook so adjust, might not be needed because of tensorboard
-#train -> trains a model from the commandline, although I have to figure out how to set hyperparameters, 
-    # model architecture and other things in the input
-#inference -> uses a trained model to make a prediction on data
-
-
-#next(model.parameters()).is_cuda #check if model on cuda
-
-#tensorboard --logdir=experiment_logs/runs      #To open tensorboard click the link
-
-#Pytorch tensor format is (batch,C,H,W)
-
 
 import os 
 import glob
@@ -42,9 +19,6 @@ from utils.config import RESULTS_FILENAME
 from utils.config import MODELS_DIRECTORY
 from utils.config import RESULTS_DIRECTORY
 from utils.config import METADATA_FILENAME
-
-#try:
-#except ModuleNotFoundError:
 
 
 def create_writer(experiment_name: str,
@@ -221,18 +195,22 @@ def save_model(model: torch.nn.Module,
     #create models directory if it doesn't exist
     os.makedirs(os.path.dirname(MODELS_DIRECTORY), exist_ok=True)
 
-    #assert model_name.endswith(".pth") or model_name.endswith(".pt"), "model_name should end with '.pt' or '.pth'"
+    # model_name should end with '.pt' or '.pth'"
     if not (model_name.endswith(".pth") or model_name.endswith(".pt")):
         print("model_name should end with '.pt' or '.pth', not saving.")
         return
     
     # Create model save path    
     model_save_path = os.path.join(MODELS_DIRECTORY,model_name)
-    
-    if os.path.exists(model_save_path) and not overwrite: #exists no overwrite -> not saving
-        print(f"[INFO] A model already exists at: {model_save_path}, not overwriting.")
-    elif os.path.exists(model_save_path) and overwrite: #exists and overwrite -> overwrites
+
+    #already exists and no overwrite -> not saving
+    if os.path.exists(model_save_path) and not overwrite: 
+        print(f"[INFO] A model already exists at: {model_save_path}, "
+              "not overwriting.")
+    #already exists and and overwrite -> overwrites
+    elif os.path.exists(model_save_path) and overwrite: 
         print(f"[INFO] Overwriting model {model_name} at {model_save_path}")
+    #doesn't exist -> saves
     else:
         # Save the model state_dict()
         torch.save(obj=model.state_dict(),
@@ -304,14 +282,10 @@ def hyperparameter_combinations(hyperparams: Dict[str,list]):
         [(20,10,0.1),(20,10,0.01),...,(100,30,0.001)]
     """
 
-    hyperparams_list = []
     hyperparams_combinations = []
     tuple_combinations = []
 
-    for key in hyperparams.keys():
-        hyperparams_list.append(hyperparams[key])
-    
-    for hplist in hyperparams_list:
+    for hplist in hyperparams.values():
         hyperparams_combinations = combine_lists(hyperparams_combinations,hplist)
 
     for combination in hyperparams_combinations:
@@ -347,7 +321,8 @@ def create_dataframe(results:Dict,hyperparameters_tuple,hyperparameters_keys):
 
     return resdf
 
-def save_dataframe(df:pd.DataFrame,experiment_name:str,model_name:str,extra:str):
+def save_dataframe(df:pd.DataFrame,experiment_name:str,
+                   model_name:str,extra:str):
     """Saves a dataframe in the Feather format. 
     
     The path to save it is 
@@ -386,15 +361,19 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
     retrieve_results(experiment_name=Experiment_1) will retrieve all results 
     inside the Experiment_1 folder regardless of model_name and extra. 
     retrieve_results() will retrieve all results. 
-    Adds a column named ID that stores the number of each dataframe.
+    Adds a column named ID that stores the number of each dataframe and orders
+    the columns so only the hyperparameters are placed before the train_loss 
+    column.
     
     Args:         
         experiment_name: Name of the experiment folder.
         model_name: Name of the model folder.
         extra: Name of the extra folder. 
+    
     Returns: 
         A dataframe. 
     """
+
     if experiment_name is None:
         experiment_name = "*"
     if model_name is None:
@@ -406,7 +385,8 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
     list_of_paths = glob.glob(os.path.join(RESULTS_DIRECTORY,experiment_name,
                                            model_name,extra,RESULTS_FILENAME))
     if list_of_paths == []:
-        print(f"[WARNING] The provided folder names '{experiment_name}','{model_name}','{extra}' or its combination are not valid.")
+        print(f"[WARNING] The provided folder names '{experiment_name}','{model_name}','{extra}' "
+              "or its combination are not valid.")
         return
     
     results = pd.DataFrame()
@@ -415,8 +395,9 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
         # Create a unique identifier for each dataframe every time you load them
         df["ID"] = [n]*len(df)
         
-        # The column order will be set so hyperparameters are always first, 
+        # The columns will be reordered so hyperparameters are always first, 
         # followed by train_loss and the rest does not really matter
+
         # The columns before training_loss are always hyperparameters if the dfs
         # have not been merged yet
         new_col = df.columns.to_list() # New columns
@@ -442,252 +423,3 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
         results = results[all_columns_ordered]
 
     return results
-
-def plot_results(results:pd.DataFrame,experiment_name=None,model_name=None):
-    """Plots the results obtained with retrieve_results().
-    
-    Args: 
-        results: A dataframe containing the results to plot.
-        experiment_name: Name of the experiment folder. Has to be the same one 
-            used to retrieve the results. 
-        model_name: Name of the model folder. Has to be the same one used to 
-            retrieve the results.
-    """
-
-    names = iter(results["ID"].unique()) # 1 label per feather file
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    color_cycle = itertools.cycle(colors)
-   
-    fig,ax = plt.subplots(2,1,figsize=(10,10),num=" ")
-
-    ax[0].set_ylabel("Accuracy")
-    ax[0].set_xlabel("Epochs")
-    ax[0].set_facecolor("#DFE1E3") #Good background color "#DFE1E3"
-    ax[0].grid()
-    
-    ax[1].set_ylabel("Average loss per batch")
-    ax[1].set_xlabel("Epochs")
-    ax[1].set_facecolor("#DFE1E3") 
-    ax[1].grid()
-
-    title_acc = "Training and testing accuracy"
-    title_loss = "Training and testing loss"
-    # if the experiment name or model name have been specified they will not 
-    # appear in the label, so we add them to the title
-    if experiment_name and model_name:
-        title_acc += " for experiment "+experiment_name+ " and model "+model_name
-        title_loss += " for experiment "+experiment_name+ " and model "+model_name
-    elif experiment_name:
-        title_acc += " for experiment "+experiment_name
-        title_loss += " for experiment "+experiment_name
-    elif model_name:
-        title_acc += " for model "+model_name
-        title_loss += " for model "+model_name
-
-    ax[0].set_title(title_acc)
-    ax[1].set_title(title_loss)
-
-
-    train0, = ax[0].plot(np.nan,np.nan,'-',label="train",color ='black')
-    test0, = ax[0].plot(np.nan,np.nan,'--',label="test",color='black')
-
-    ttlegend0 = ax[0].legend(handles=[train0,test0],loc=3)# Legend for train test in acc
-
-    ax[0].add_artist(ttlegend0)
-
-    train1, = ax[1].plot(np.nan,np.nan,'-',label="train",color ='black') 
-    test1, = ax[1].plot(np.nan,np.nan,'--',label="test",color='black')
-
-    ttlegend1 = ax[1].legend(handles=[train1,test1],loc=3) # Legend forg train test in loss
-
-    ax[1].add_artist(ttlegend1)
-
-    for id in results["ID"].unique():
-        df = results[results["ID"]==id]
-
-        col = next(color_cycle)
-        name = next(names)
-
-        ax[0].plot(df[["Epoch #"]],df[["train_acc"]],'-',color=col,label=name)
-        ax[0].plot(df[["Epoch #"]],df[["test_acc"]],'--',color=col,label=name) 
-
-        ax[1].plot(df[["Epoch #"]],df[["train_loss"]],'-',color=col,label=name)
-        ax[1].plot(df[["Epoch #"]],df[["test_loss"]],'--',color=col,label=name)
-
-    #Dummy legend so it doesn't delete the train test legend
-    ax[0].legend()
-    ax[1].legend()
-    ax[0].legend().set_visible(False)
-    ax[1].legend().set_visible(False)
-
-    def hover(event):
-        if event.inaxes is ax[0]:
-            selected = [line for line in ax[0].get_lines() if line.contains(event)[0]]
-            if selected != []:
-                handle = [mlines.Line2D([], [], color=sel.get_color(), label=sel.get_label()) for sel in selected]
-                ax[0].legend(loc=2,handles=handle)
-                fig.canvas.draw_idle()
-            if selected == []:
-                ax[0].get_legend().set_visible(False)
-                fig.canvas.draw_idle()
-
-        elif event.inaxes is ax[1]:
-            selected = [line for line in ax[1].get_lines() if line.contains(event)[0]]
-            if selected != []:
-                handle = [mlines.Line2D([], [], color=sel.get_color(), label=sel.get_label()) for sel in selected]
-                ax[1].legend(loc=2,handles=handle)
-                fig.canvas.draw_idle()
-            if selected == []:
-                ax[1].get_legend().set_visible(False)
-                fig.canvas.draw_idle()
-
-    fig.canvas.mpl_connect("motion_notify_event", hover)
-
-    plt.show()
-
-
-
-
-
-
-
-
-
-
-
-def plot_results_upgraded(results:pd.DataFrame,experiment_name=None,model_name=None):
-    """Plots the results obtained with retrieve_results().
-    
-    Args: 
-        results: A dataframe containing the results to plot.
-        experiment_name: Name of the experiment folder. Has to be the same one 
-            used to retrieve the results. 
-        model_name: Name of the model folder. Has to be the same one used to 
-            retrieve the results.
-    """
-
-    #names = iter(results["ID"].unique()) # 1 label per feather file
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    color_cycle = itertools.cycle(colors)
-   
-    fig,ax = plt.subplots(2,1,figsize=(10,10),num=" ")
-
-    ax[0].set_ylabel("Accuracy")
-    ax[0].set_xlabel("Epochs")
-    ax[0].set_facecolor("#E5E7E9") #Good background color "#E5E7E9"
-    ax[0].grid()
-    
-    ax[1].set_ylabel("Average loss per batch")
-    ax[1].set_xlabel("Epochs")
-    ax[1].set_facecolor("#E5E7E9") 
-    ax[1].grid()
-
-    title_acc = "Training and testing accuracy"
-    title_loss = "Training and testing loss"
-    ax[0].set_title(title_acc)
-    ax[1].set_title(title_loss)
-
-    train0, = ax[0].plot(np.nan,np.nan,'-',label="train",color ='black')
-    test0, = ax[0].plot(np.nan,np.nan,'--',label="test",color='black')
-
-    ttlegend0 = ax[0].legend(handles=[train0,test0],loc=2,fancybox=True, framealpha=0.7)# Legend for train test in acc
-
-    ax[0].add_artist(ttlegend0)
-
-    train1, = ax[1].plot(np.nan,np.nan,'-',label="train",color ='black') 
-    test1, = ax[1].plot(np.nan,np.nan,'--',label="test",color='black')
-
-    ttlegend1 = ax[1].legend(handles=[train1,test1],loc=2,fancybox=True, framealpha=0.7) # Legend forg train test in loss
-
-    ax[1].add_artist(ttlegend1)
-
-    linesax0 = [] 
-    linesax1 = []
-    names = {}
-
-    for id in results["ID"].unique():
-        df = results[results["ID"]==id]
-
-        col = next(color_cycle)
-        #name = next(names)
-        expname = results["Experiment_name"][results["ID"]==id].unique()[0]
-        modname = results["Model_name"][results["ID"]==id].unique()[0]
-        extraname = results["Extra"][results["ID"]==id].unique()[0]
-        name = expname + " " + modname + " " + extraname
-        names.update({name: [expname,modname,extraname]})
-
-        line_tr_acc, = ax[0].plot(df[["Epoch #"]],df[["train_acc"]],'-',color=col,label=name)
-        ax[0].plot(df[["Epoch #"]],df[["test_acc"]],'--',color=col,label=name) 
-
-        line_tr_loss, = ax[1].plot(df[["Epoch #"]],df[["train_loss"]],'-',color=col,label=name)
-        ax[1].plot(df[["Epoch #"]],df[["test_loss"]],'--',color=col,label=name)
-        #saving only the solid lines for the legend
-        linesax0.append(line_tr_acc)
-        linesax1.append(line_tr_loss)
-#####################################################################################
-
-    leg0 = ax[0].legend(handles=linesax0,loc=1,fancybox=True, framealpha=0.7)
-    leg1 = ax[1].legend(handles=linesax1,loc=1,fancybox=True, framealpha=0.7)
-    leg0.set_visible(False)
-    leg1.set_visible(False)
-
-    ax0annotation = ax[0].annotate(text="",
-                            xy=(2,0.4),
-                            xytext=(0,20),
-                            textcoords="offset pixels", #data
-                            color="#3D3E41", # #3D3E41 font color
-                            ha="center",
-                            bbox={'boxstyle':'round','fc':'w','edgecolor':'w'},
-                            #arrowprops={'arrowstyle':'->'}
-                            )
-    ax0annotation.set_visible(False)
-    
-    ax1annotation = ax[1].annotate(text="",
-                            xy=(0,0),
-                            xytext=(0,20),
-                            textcoords="offset pixels", #data
-                            color="#3D3E41", # #3D3E41 font color
-                            ha="center",
-                            bbox={'boxstyle':'round','fc':'w','edgecolor':'w'},
-                            #arrowprops={'arrowstyle':'->'}
-                            )
-    ax1annotation.set_visible(False)
-
-    def hover(event):
-        if event.inaxes is ax[0]:
-            selected = [line for line in ax[0].get_lines() if line.contains(event)[0]]
-
-            if selected:
-                mouse_position = (event.xdata, event.ydata)
-                ax0annotation.set_visible(True)
-                expn,modn,extn = names[selected[0].get_label()]      
-                ax0annotation.set_text("EXPERIMENT: "+expn+"\n"+"MODEL: "+modn+"\n"+"HP: "+extn)
-                ax0annotation.get_bbox_patch().set_facecolor(selected[0].get_color()+"CC")
-                ax0annotation.get_bbox_patch().set_edgecolor(selected[0].get_color())
-                ax0annotation.xy = mouse_position
-                fig.canvas.draw_idle()
-            else:
-                ax0annotation.set_visible(False)
-                fig.canvas.draw_idle()
-            
-        if event.inaxes is ax[1]:
-            selected = [line for line in ax[1].get_lines() if line.contains(event)[0]]
-
-            if selected:
-                mouse_position = (event.xdata, event.ydata)
-                ax1annotation.set_visible(True)         
-                expn,modn,extn = names[selected[0].get_label()]      
-                ax1annotation.set_text("EXPERIMENT: "+expn+"\n"+"MODEL: "+modn+"\n"+"HP: "+extn)          
-                ax1annotation.get_bbox_patch().set_facecolor(selected[0].get_color()+"CC")
-                ax1annotation.get_bbox_patch().set_edgecolor(selected[0].get_color())
-                ax1annotation.xy = mouse_position
-                fig.canvas.draw_idle()
-            else:
-                ax1annotation.set_visible(False)
-                fig.canvas.draw_idle()
-
-    fig.canvas.mpl_connect("motion_notify_event", hover)
-
-    #plt.show()
-
-    return fig,ax
