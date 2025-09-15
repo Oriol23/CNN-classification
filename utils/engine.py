@@ -93,10 +93,10 @@ def test_step(model: torch.nn.Module,
     return test_loss, test_acc
 
 
-def train(model: torch.nn.Module | List, 
+def train(model: List, 
           train_dataloader: torch.utils.data.DataLoader, 
           test_dataloader: torch.utils.data.DataLoader, 
-          optimizer: torch.optim.Optimizer | List,
+          optimizer: List,
           loss_fn: torch.nn.Module,
           epochs: int, 
           iters=None,
@@ -148,23 +148,16 @@ def train(model: torch.nn.Module | List,
     
     #Loop through the number of iterations
     for iter in range(iters):
-        # if model and optimizer are a single object
-        model_0 = model
-        optimizer_0 = optimizer
-        # If they are a list, iter must have been called in the experiment 
-        # pipeline
         if iter_flag:
             print(f"Iteration {iter+1}")
-            model_0 = model[iter] #type:ignore
-            optimizer_0 = optimizer[iter] #type:ignore
         # Loop through training and testing steps for a number of epochs
         for epoch in tqdm(range(epochs)):
-            train_loss, train_acc = train_step(model=model_0, #type:ignore
+            train_loss, train_acc = train_step(model=model[iter], #type:ignore
                                             dataloader=train_dataloader,
                                             loss_fn=loss_fn,
-                                            optimizer=optimizer_0,#type:ignore
+                                            optimizer=optimizer[iter],#type:ignore
                                             device=device)
-            test_loss, test_acc = test_step(model=model_0, #type:ignore
+            test_loss, test_acc = test_step(model=model[iter], #type:ignore
                                             dataloader=test_dataloader,
                                             loss_fn=loss_fn,
                                             device=device)

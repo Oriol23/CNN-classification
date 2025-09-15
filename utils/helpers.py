@@ -52,8 +52,7 @@ def create_and_save_experiment_metadata(experiment_name: str,
                                 optimizer: torch.optim.Optimizer,
                                 loss_fn: torch.nn.Module,
                                 epochs: int,
-                                hyperparameters_tuple:Tuple,
-                                hyperparameters_keys
+                                hyperparameters_combination: Dict,
                                 ):
     """Creates and saves a dictionary containig information about an experiment. 
     
@@ -79,6 +78,8 @@ def create_and_save_experiment_metadata(experiment_name: str,
         optimizer: PyTorch optimizer used.
         loss_fn: PyTorch loss function used.      
         epochs: Number of epochs the model has been trained for.
+        hyperparameters_combination: A dictionary containing the name and value
+            of every hyperparameter used in the experiment.
     """
 
     experiment_data = {}
@@ -109,10 +110,7 @@ def create_and_save_experiment_metadata(experiment_name: str,
     experiment_data.update({"testing dataset size": tst_dataset_size})
     experiment_data.update({"batch size": batch_size})
     #Stores the hyperparameters
-    hp={}
-    for m,key in enumerate(hyperparameters_keys):
-        hp.update({key:[hyperparameters_tuple[m]]})
-    experiment_data.update({"Hyperparams": hp})
+    experiment_data.update({"Hyperparams": hyperparameters_combination})
     
     try: 
         experiment_data.update({"optimizer params": 
@@ -278,31 +276,33 @@ def hyperparameter_combinations(hyperparams: Dict[str,list]):
                             'lr': [0.1,0.01,0.001] } 
                             
     Returns: 
-        A list of tuples of all possible combinations, e.g 
-        [(20,10,0.1),(20,10,0.01),...,(100,30,0.001)]
+        A list of dictionaries of all combinations of hyperparameters, e.g 
+        [{'Hidden Channels': 20, 'Epochs': 10, 'lr': 0.1},
+        {'Hidden Channels': 20, 'Epochs': 10, 'lr': 0.01},
+        ...,
+        {'Hidden Channels': 100, 'Epochs': 30, 'lr': 0.001}]
     """
 
     hyperparams_combinations = []
-    tuple_combinations = []
+    dict_comb = []
 
     for hplist in hyperparams.values():
-        hyperparams_combinations = combine_lists(hyperparams_combinations,hplist)
-
-    for combination in hyperparams_combinations:
-        tuple_combinations.append(tuple(combination))
+        hyperparams_combinations=combine_lists(hyperparams_combinations,hplist)
     
-    return tuple_combinations
+    for comb in hyperparams_combinations:
+        dict_comb.append({key:val for key,val in zip(hyperparams.keys(),comb)})
+    
+    return dict_comb
 
 
-def create_dataframe(results:Dict,hyperparameters_tuple,hyperparameters_keys):
+def create_dataframe(results:Dict,hyperparameters_combination):
     """Creates a pandas dataframe with the results of an experiment.
     
     Args: 
         results: A dictionary with the accuracy and loss results.
             Obtained with the train function.
-        hyperparameters_tuple: A tuple with the values of the hyperparameters 
-            used in the experiment.
-        hyperparameters_keys: The keys of the hyperparameters dictionary used.
+        hyperparameters_combination: A dictionary containing the name and value
+            of every hyperparameter used in the experiment.
     
     Returns:
         A dataframe containing the values of the hyperparameters and the 
@@ -312,8 +312,9 @@ def create_dataframe(results:Dict,hyperparameters_tuple,hyperparameters_keys):
     #Accesses the first column and sees the number of datapoints
     n_datapoints = len(results[next(iter(results.keys()))])
     #Stores the hyperparameters
-    for m,key in enumerate(hyperparameters_keys):
-        dict_to_df.update({key:[hyperparameters_tuple[m]]*n_datapoints})
+    for key,val in hyperparameters_combination.items():
+        hyperparameters_combination.update({key:[val]*n_datapoints})
+
     #Stores the results
     dict_to_df.update(results)
 
