@@ -206,7 +206,7 @@ def render_content(tab,exps_dict,mods_dict):
         filtered_res = results.query(query)  # type: ignore
 
         # Select which HP will be available to be filtered from all the HP
-        # select all columns where the HP values are not all NAN 
+        # select all columns where values are not all NAN 
         all_columns = [col for col in filtered_res.columns if not filtered_res[col].isnull().all()]
         # HP are by definition the columns before train_loss
         if 'train_loss' in all_columns:
@@ -215,8 +215,8 @@ def render_content(tab,exps_dict,mods_dict):
             return html.Div([html.Br(),
                              "No experiments or models have been selected."])
         # Iter will not be filterable in any case
-        if "Iter" in hp_names:
-            hp_names.remove("Iter")
+        #if "Iter" in hp_names:
+        #    hp_names.remove("Iter")
         centered = {"display": "flex","justifyContent": "center"}
         names = [html.Div(name,style=centered) for name in hp_names]
 
@@ -323,6 +323,7 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
         x = re.sub("Iter_[0-9]+", "", extra)
         x = re.sub("_$", "", x)
         x = re.sub("^_", "", x)
+        x = re.sub("__", "_", x)
 
         template=f"<b>Experiment: </b>{expn}<br><b>Model: </b>{modn}<br>"
         legtitle = "Experiment <b> Model </b> Hyperparameters Iteration<br>"
@@ -423,6 +424,7 @@ def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
         x = re.sub("Iter_[0-9]+", "", extra)
         x = re.sub("_$", "", x)
         x = re.sub("^_", "", x)
+        x = re.sub("__", "_", x)
 
         template=f"<b>Experiment: </b>{expn}<br><b>Model: </b>{modn}<br>"
         legtitle ="Experiment <b> Model </b> Hyperparameters Iteration <br>"

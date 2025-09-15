@@ -313,7 +313,7 @@ def create_dataframe(results:Dict,hyperparameters_combination):
     n_datapoints = len(results[next(iter(results.keys()))])
     #Stores the hyperparameters
     for key,val in hyperparameters_combination.items():
-        hyperparameters_combination.update({key:[val]*n_datapoints})
+        dict_to_df.update({key:[val]*n_datapoints})
 
     #Stores the results
     dict_to_df.update(results)
@@ -362,9 +362,9 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
     retrieve_results(experiment_name=Experiment_1) will retrieve all results 
     inside the Experiment_1 folder regardless of model_name and extra. 
     retrieve_results() will retrieve all results. 
-    Adds a column named ID that stores the number of each dataframe and orders
-    the columns so only the hyperparameters are placed before the train_loss 
-    column.
+    Adds a column named ID that acts as a unique identifier for each dataframe 
+    and orders the columns so only the hyperparameters are placed before the 
+    train_loss column.
     
     Args:         
         experiment_name: Name of the experiment folder.
