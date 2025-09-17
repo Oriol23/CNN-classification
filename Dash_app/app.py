@@ -1,5 +1,6 @@
 from dash import Dash, dcc, html, Input, Output, State, callback, ALL
 import dash_bootstrap_components as dbc
+from dash.exceptions import PreventUpdate
 import dash_daq as daq
 
 import plotly.graph_objects as go
@@ -35,7 +36,8 @@ modn_uniq = results["Model_name"].unique().tolist() # type:ignore
 ###################################
 
 
-app = Dash(__name__,external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = Dash(__name__,external_stylesheets=[dbc.themes.BOOTSTRAP],
+           suppress_callback_exceptions=True)
 
 
 ############## Layout ##############
@@ -48,10 +50,10 @@ app.layout = html.Div(children=[
     # Tabs for the exp and model selector and HP filter
     dcc.Tabs(id='tabs', value='tab-1', children=[
         dcc.Tab(label='Select experiments and models', value='tab-1'),
-        dcc.Tab(label='Filter hyperparameters', value='tab-2'),
+        dcc.Tab(label='Filter results', value='tab-2'),
         ]),
     html.Div(id='tabs-content',children=[html.Br(),
-            dbc.Row([dbc.Col("Experiments"),dbc.Col("Models")],style={"marginLeft": "1rem"}),
+            dbc.Row([dbc.Col("Experiments"),dbc.Col("Models")],style={"marginLeft": "1.5rem"}),
             html.Div(dbc.Row([
                     dbc.Col(dcc.Dropdown(id="exp_dropdown",options=expn_uniq, 
                                          value=expn_uniq[0],multi=True)),
@@ -183,7 +185,7 @@ def render_content(tab,exps_dict,mods_dict):
         except KeyError:
             mods = []
         return [html.Br(),
-            dbc.Row([dbc.Col("Experiments"),dbc.Col("Models")],style={"marginLeft": "1rem"}),
+            dbc.Row([dbc.Col("Experiments"),dbc.Col("Models")],style={"marginLeft": "1.5rem"}),
             html.Div(dbc.Row([
                     dbc.Col(dcc.Dropdown(id="exp_dropdown",options=expn_uniq, 
                                          value=exps,multi=True)),
@@ -203,7 +205,7 @@ def render_content(tab,exps_dict,mods_dict):
             mods_chosen = []
         query = f"Experiment_name == {exps_chosen} & "
         query += f"Model_name == {mods_chosen}"
-        filtered_res = results.query(query)  # type: ignore
+        filtered_res = results.query(query)  # type: ignore        
 
         # Select which HP will be available to be filtered from all the HP
         # select all columns where values are not all NAN 
@@ -214,9 +216,6 @@ def render_content(tab,exps_dict,mods_dict):
         else:
             return html.Div([html.Br(),
                              "No experiments or models have been selected."])
-        # Iter will not be filterable in any case
-        #if "Iter" in hp_names:
-        #    hp_names.remove("Iter")
         centered = {"display": "flex","justifyContent": "center"}
         names = [html.Div(name,style=centered) for name in hp_names]
 
@@ -236,9 +235,17 @@ def render_content(tab,exps_dict,mods_dict):
                                         value=values,
                                         multi=True))
         output = [val for pair in zip(names,hp_drop) for val in pair]
-        output.insert(0,html.Div("All hyperparameter filters will be reset "
+        output.insert(0,html.Br())
+        output.insert(1,html.Div("All filters will be reset "
                                 "when switching between tabs."))        
-        output.insert(0,html.Br())          
+        output.insert(2,html.Br())
+        output.insert(3,dbc.InputGroup([
+            dbc.InputGroupText("Select maximum train accuracy > "),
+            dbc.Input(id={"type": "max_acc", "index": 0},
+                      type="number",
+                      min=0,max=1)
+            ]))
+
         return html.Div(children=output,
                         style={"marginLeft": "1.5rem","marginRight": "1.5rem"})
 
@@ -275,6 +282,65 @@ def update_models(exps_chosen):
     model_choices=[mod for mod in filtered_exps["Model_name"].unique().tolist()]
     return model_choices,model_choices
 
+# Updates available hyperparameters based on selected max acc
+@callback(Output({"type": "hp-dropdown", "index": ALL},"value"),
+          Output({"type": "hp-dropdown", "index": ALL},"options"),
+          State("selected_exps","data"),
+          State("selected_mods","data"),
+          Input({"type":"max_acc", "index": ALL},"value"),
+          prevent_initial_call=True)
+def update_hp(exps_dict,mods_dict,thrs):
+    #print("UPDATE HP")
+    try: 
+        exps_chosen = [exp for exp in exps_dict["0"].values()]
+    except KeyError:
+        exps_chosen = []
+    try:
+        mods_chosen = [exp for exp in mods_dict["0"].values()]
+    except KeyError:
+        mods_chosen = []
+    if thrs == []:
+        thrs = None
+    else:
+        thrs = thrs[0]
+    query = f"Experiment_name == {exps_chosen} & "
+    query += f"Model_name == {mods_chosen}"
+    filtered_res = results.query(query)  # type: ignore 
+
+    # Filter by maximum train accuracy higher than an input value
+    
+    if thrs == None or thrs == 0:
+        pass
+    else:
+        # Select all IDs that pass the acc threshold, that way we include the
+        # test accuracy and loss even if they are below the threshold
+        id=filtered_res["ID"][filtered_res["train_acc"]>=thrs].unique().tolist()
+        filtered_res = filtered_res.query(f"ID == {id}")
+
+    # Select which HP will be available to be filtered from all the HP
+    # select all columns where values are not all NAN 
+    all_columns = [col for col in filtered_res.columns if not filtered_res[col].isnull().all()]
+    # HP are by definition the columns before train_loss
+    if 'train_loss' in all_columns:
+        hp_names = all_columns[0:all_columns.index('train_loss')]
+    else:
+        raise PreventUpdate
+    
+    # Find all the new different HP values
+    all_drop_values = []
+    for hp in hp_names:
+        # Possible values for a HP
+        values = filtered_res[hp].unique().tolist()
+        # If the HP has a NAN value anywhere
+        if filtered_res[hp].isnull().any():
+            # replace nan with Not specified 
+            values_wo_nan = [val for val in values if not np.isnan(val)]
+            values = values_wo_nan[:]+["Not specified"]
+        all_drop_values.append(values)
+
+    return all_drop_values,all_drop_values
+
+
 # Plots accuracy
 @callback(Output(component_id="acc_plot",component_property="figure"),
           Input(component_id="acc_legend_toggle",component_property="on"),
@@ -282,9 +348,10 @@ def update_models(exps_chosen):
           Input("selected_mods", "data"),
           Input({"type": "hp-dropdown", "index": ALL},"value"),
           Input({"type": "hp-dropdown", "index": ALL},"id"),
+          Input({"type":"max_acc", "index": ALL},"value"),
             )
-def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
-
+def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
+    #print("PLOT ACC")
     color_palette = pc.qualitative.Dark24
     colors = iter(color_palette)
 
@@ -296,11 +363,35 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
         mods = [mod for mod in mods_chosen["0"].values()]
     except KeyError:
         mods = []
-    
+    if thrs == []:
+        thrs = None
+    else:
+        thrs = thrs[0]
     # Filter by selected experiments, models and HP values
     query = f"Experiment_name == {exps} & "
     query += f"Model_name == {mods}"
-    filtered_res = results.query(query) # type: ignore
+    filt_res = results.query(query) # type: ignore
+
+    # Filter by accuracy threshold
+    if thrs == None or thrs == 0:
+        add_thrs_line = False
+        filtered_res = filt_res
+    else:
+        # Select all IDs and Iter # that pass the acc threshold, that way we 
+        # include the test accuracy and loss even if they are below the 
+        # threshold (If we dont group by Iter # we add all iters instead of 
+        # those above the threshold)
+        gb = filt_res.groupby(["ID","Iter #"]).max("train_acc") #type:ignore
+        idx_list = gb[gb["train_acc"]>=thrs].index
+        filtered_res = pd.DataFrame()
+        for idx in idx_list:
+            id = idx[0]
+            it = idx[1]
+            df = filt_res[(filt_res["ID"]==id) & (filt_res["Iter #"]==it)]      #type:ignore
+            filtered_res = pd.concat([filtered_res,df],ignore_index=True)
+        add_thrs_line = True
+
+    # Filter by hyperparameters
     for val_list, id_dict in zip(hp_values,hp_ids):
         # Not specified corresponds to nan in HP value, so check for that 
         # alongside the other specified values
@@ -364,7 +455,8 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
                                     name="", 
                                     line={"color": color, "dash": "dash"}, 
                                     hovertemplate=hovertemp+"%{y:.3f}</extra>"))
-
+        if add_thrs_line:
+            fig.add_hline(y=thrs)
         fig.update_layout(xaxis_title="Epochs", yaxis_title="Accuracy",
                             showlegend=acc_legend,
                             legend_title={"text": legtitle},
@@ -388,8 +480,9 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
           Input("selected_mods", "data"),
           Input({"type": "hp-dropdown", "index": ALL},"value"),
           Input({"type": "hp-dropdown", "index": ALL},"id"),
+          Input({"type":"max_acc", "index": ALL},"value"),
           )
-def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
+def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
     #print("PLOT LOSS")
     color_palette = pc.qualitative.Dark24
     colors = iter(color_palette)
@@ -402,10 +495,34 @@ def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids):
         mods = [mod for mod in mods_chosen["0"].values()]
     except KeyError:
         mods = []
-    
+    if thrs == []:
+        thrs = None
+    else:
+        thrs = thrs[0]
     query = f"Experiment_name == {exps} & "
     query += f"Model_name == {mods}"
-    filtered_res = results.query(query) # type: ignore
+    filt_res = results.query(query) # type: ignore
+
+    # Filter by accuracy threshold
+    if thrs == None or thrs == 0:
+        add_thrs_line = False
+        filtered_res = filt_res
+    else:
+        # Select all IDs and Iter # that pass the acc threshold, that way we 
+        # include the test accuracy and loss even if they are below the 
+        # threshold (If we dont group by Iter # we add all iters instead of 
+        # those above the threshold)
+        gb = filt_res.groupby(["ID","Iter #"]).max("train_acc") #type:ignore
+        idx_list = gb[gb["train_acc"]>=thrs].index
+        filtered_res = pd.DataFrame()
+        for idx in idx_list:
+            id = idx[0]
+            it = idx[1]
+            df = filt_res[(filt_res["ID"]==id) & (filt_res["Iter #"]==it)]      #type:ignore
+            filtered_res = pd.concat([filtered_res,df],ignore_index=True)
+        #id=filtered_res["ID"][filtered_res["train_acc"]>=thrs].unique().tolist()
+        #filtered_res = filtered_res.query(f"ID == {id}")
+        add_thrs_line = True
     for val_list, id_dict in zip(hp_values,hp_ids):
         if "Not specified" in val_list:
             query = f"{id_dict["index"]}.isnull() | {id_dict["index"]} == {val_list} "
