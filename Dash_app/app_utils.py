@@ -1,8 +1,33 @@
+import math
 import pandas as pd
 from typing import Dict
 from scipy.stats import pearsonr
+from pandas.api.types import is_object_dtype
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.inspection import permutation_importance
+
+
+
+
+def round_nnz(x,n_extra=0):
+    """
+    Round a number to the nearest non-zero decimal.
+
+    Or the nearest pluts n_extra
+
+    """
+    if x == 0:
+        return 0
+
+    magnitude = math.floor(math.log10(abs(x))) # 10 ^ magnitude of the number
+
+    # If number >= 1, round to nearest integer
+    if magnitude >= 0:
+        return round(x)
+
+    # If number between 1 and 1e-4 round to nearest non-zero decimal
+    decimals = abs(magnitude)
+    return round(x, decimals+n_extra)
 
 
 def calculate_importance(grouped_res) -> Dict: #type:ignore
@@ -40,6 +65,13 @@ def calculate_importance(grouped_res) -> Dict: #type:ignore
                                                 "Importance":[],
                                                 "Uncertainty":[] }}})
             continue
+
+        # if any of the hyperparameters is categorical we drop it since both tests 
+        # are for numeric variables
+        for hp in col_X:
+            if is_object_dtype(df.loc[:,hp]):    
+                col_X.remove(hp)
+
         X = df[col_X]       
         y = df[[col_y]]     
         r,p = pearsonr(X,y)
@@ -58,4 +90,4 @@ def calculate_importance(grouped_res) -> Dict: #type:ignore
                         "p-value":p,
                         "Importance":importance["importances_mean"]/sum(importance["importances_mean"]),#type:ignore
                         "Uncertainty":importance["importances_std"]}}})
-        return importance_database
+    return importance_database

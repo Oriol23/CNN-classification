@@ -7,10 +7,12 @@ import plotly.graph_objects as go
 import plotly.colors as pc
 
 from app_utils import calculate_importance
+from app_utils import round_nnz
 
 import pandas as pd
 import numpy as np
 import base64
+import math
 import sys
 import re 
 import os
@@ -32,15 +34,17 @@ img_source = "data:image/png;base64," + encoded
 
 results = retrieve_results()  # type: ignore
 grouped_res = results.groupby(["Experiment_name","Model_name"]) #type:ignore
-#importance = calculate_importance(grouped_res)
-importance = {}
+importance = calculate_importance(grouped_res)
 exp_mod_pairs = list(grouped_res.indices.keys())
 expn_uniq = results["Experiment_name"].unique().tolist() # type:ignore
 modn_uniq = results["Model_name"].unique().tolist() # type:ignore
 
 ############### App ################
-
-app = Dash(__name__,external_stylesheets=[dbc.themes.BOOTSTRAP],
+external_stylesheets=[
+    dbc.themes.BOOTSTRAP,
+    "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+]
+app = Dash(__name__,external_stylesheets=external_stylesheets,
            suppress_callback_exceptions=True)
 
 
@@ -400,7 +404,7 @@ def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
         all_val = filtered_res[hp].fillna("Not specified")
         # Possible values for a HP
         values = all_val.unique().tolist()
-                
+
         all_drop_values.append(values)
     # if the accuracy threshold makes all the curves with a particular HP
     # disappear add Not specified because that hp will not appear in hp_names
@@ -440,20 +444,96 @@ def update_accordion(exps,mods):
 def render_importance(active_item_id,exps,mods):
     #print("RENDER IMPORTANCE")
     
-    ret = []
+    empty_idxs = []
+    good_pairs = []
+    imp_tables = []
+
+    info_imp = html.I(className="bi bi-info-circle ms-2",
+                      id="info-imp",
+                      style={"cursor": "pointer", "color": "#0d6efd"})
+    info_corr = html.I(className="bi bi-info-circle ms-2",
+                      id="info-corr",
+                      style={"cursor": "pointer", "color": "#0d6efd"})
+    info_hp = html.I(className="bi bi-info-circle ms-2",
+                      id="info-hp",
+                      style={"cursor": "pointer", "color": "#0d6efd"})
     m = 0
     for exp in exps:
         for mod in mods:
             if (exp,mod) in exp_mod_pairs:
                 n = exp_mod_pairs.index((exp,mod)) # index of the exp mod pair
                 if str(n) in active_item_id:
-                    ret.append(html.Div(f"This is ouput {n} and accordion {m}"))       #type:ignore
+                    good_pairs.append((exp,mod))
+                    #ordered_tables.append(0)
                     m+=1
-                    #imp_dict = importance[exp][mod]
                 else: 
-                    ret.append(None)
+                    empty_idxs.append(m)
                     m+=1
-    return ret
+    
+    for (exp,mod) in good_pairs:
+        hp_names = importance[exp][mod]["Hyperparameters"]
+        corr = importance[exp][mod]["Correlation"]
+        p = importance[exp][mod]["p-value"]
+        imp = importance[exp][mod]["Importance"]
+        uncert = importance[exp][mod]["Uncertainty"]
+
+        # Creates a table 
+
+        #header_names = ["Hyperparameters","Importance","Correlation","p-value"]
+
+        #table_header = [html.Thead(html.Tr(
+        #    [html.Th(header) for header in header_names]
+        #    ))]
+        
+        table_header = [html.Thead(html.Tr(
+            [html.Th([html.Span("Hyperparameters"),info_hp]),
+             #html.Th(["Importance",info_imp]),
+             html.Th([html.Span("Importance"),info_imp]),
+             html.Th([html.Span("Correlation"),info_corr]),
+             #html.Th(["Correlation",info_corr]),
+             html.Th("p-value")
+             ]
+            ))]
+
+
+        # rounding
+        # nearest non zero for uncertainty
+        # same as uncertainty for importance
+        # second nearest nonzero for correlation and p
+        uncert = [round_nnz(val) for val in uncert]
+        mag = [-int(math.floor(math.log10(abs(x)))) for x in uncert]
+        imp = [round(imp[n],mag[n]) for n in range(len(mag))]
+        corr = [round_nnz(val,1) for val in corr]
+        p = [round_nnz(val,1) for val in p]
+
+        tb = [html.Tr([html.Td(hp_names[n]),
+                       html.Td(f"{imp[n]}±{uncert[n]}"),
+                       html.Td(corr[n]),
+                       html.Td(p[n])]) for n in range(len(p))]
+        table_body = [html.Tbody(tb)]
+        
+        #row1 = html.Tr([html.Td("Arthur"), html.Td("Dent")])
+        #table_body = [html.Tbody([row1, row2, row3, row4])]
+
+        table = dbc.Container([
+            dbc.Table(table_header + table_body, bordered=True),
+            dbc.Tooltip(children="This is some info about Importance", 
+                target="info-imp", placement="top"),
+            dbc.Tooltip(children="This is some info about Correlation", 
+                target="info-corr", placement="top"),
+            dbc.Tooltip(children="This is some info about Hyperparameters", 
+                target="info-hp", placement="top"),
+        ]
+        )
+        imp_tables.append(table)
+
+    # Inserts None for all accordeons that are not open
+    [imp_tables.insert(idx,None) for idx in empty_idxs]
+
+
+    #imp_tables.append(html.Div(f"This is ouput {n} <span>&#177;</span>"))       #type:ignore
+
+    return imp_tables
     #match active_item_id with order of pairs that match exps mods
     #make it so I can have more than one active at a time
     #maybe fix this triggering twice
@@ -488,7 +568,7 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
     query += f"Model_name == {mods}"
     filt_res = results.query(query) # type: ignore
 
-    # Filter by accuracy threshold (goes before filter by HP because it 
+    # Filter by accuracy threshold (goes before HP because it 
     # modifies possible HP to choose)
     if thrs == None or thrs == 0:
         add_thrs_line = False
@@ -617,14 +697,13 @@ def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
     except KeyError:
         mods = []
     thrs = None if thrs==[] else thrs[0]
-
+    # Filter by experiment and model
     query = f"Experiment_name == {exps} & "
     query += f"Model_name == {mods}"
     filt_res = results.query(query) # type: ignore
 
     # Filter by accuracy threshold
     if thrs == None or thrs == 0:
-        add_thrs_line = False
         filtered_res = filt_res
     else:
         gb = filt_res.groupby(["ID","Iter #"]).max("train_acc") #type:ignore
@@ -635,7 +714,7 @@ def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
             it = idx[1]
             df = filt_res[(filt_res["ID"]==id) & (filt_res["Iter #"]==it)]      #type:ignore
             filtered_res = pd.concat([filtered_res,df],ignore_index=True)
-        add_thrs_line = True
+    # Filter by hyperparameter
     for val_list, id_dict in zip(hp_values,hp_ids):
         if "Not specified" in val_list:
             query = f"{id_dict["index"]}.isnull() | {id_dict["index"]} == {val_list} "
