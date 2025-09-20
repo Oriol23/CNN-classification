@@ -178,7 +178,7 @@ app.layout = html.Div(children=[
 
 # Switches between the different tabs
 @callback(Output('tabs-content', 'children'),
-          #Output('plots_display','style'),
+          #Output('plots_display','style'), # set plots invisible
             Input('tabs', 'value'),
             State("selected_exps","data"),
             State("selected_mods","data"),
@@ -235,13 +235,10 @@ def render_tabs(tab,exps_dict,mods_dict):
         # Create dropdown menus to filter for different HP values
         hp_drop = []
         for hp in hp_names:
-            # Possible values for a HP
-            values = filtered_res[hp].unique().tolist()
             # If the HP has a NAN value anywhere
-            if filtered_res[hp].isnull().any():
-                # replace nan with Not specified 
-                values_wo_nan = [val for val in values if not np.isnan(val)]
-                values = values_wo_nan[:]+["Not specified"]
+            all_val = filtered_res[hp].fillna("Not specified")
+            # Possible values for a HP
+            values = all_val.unique().tolist()
 
             hp_drop.append(dcc.Dropdown(id={"type": "hp-dropdown", "index": hp},
                                         options=values,
@@ -253,8 +250,8 @@ def render_tabs(tab,exps_dict,mods_dict):
                                  "reset when switching between tabs."))        
         output.insert(2,html.Br())
         output.insert(3,dbc.InputGroup([
-            dbc.InputGroupText("Select maximum train accuracy > "),
-            dbc.Input(id={"type": "max_acc", "index": "max_acc"}, 
+            dbc.InputGroupText("Select maximum train accuracy greater than (>)")
+            ,dbc.Input(id={"type": "max_acc", "index": "max_acc"}, 
                       type="number",
                       min=0,max=1,
                       debounce=True)
@@ -303,6 +300,7 @@ def render_tabs(tab,exps_dict,mods_dict):
         accordion = [html.Div(dbc.Accordion(children=accordion_items,
                                             id="accordion",
                                             start_collapsed=True,
+                                            always_open=True,
                     ),style={"marginLeft": "1.5rem","marginRight": "1.5rem"})]
         return dropdowns+accordion#,{"display":"none"}
 
@@ -311,7 +309,7 @@ def render_tabs(tab,exps_dict,mods_dict):
           Input("exp_dropdown","value"))
 def store_exps(exps_chosen):
     #print("STORE EXPS")
-    if isinstance(exps_chosen, str):
+    if isinstance(exps_chosen, str): # first time comes as str, then always list
         exps_chosen = [exps_chosen]
     df = pd.DataFrame(exps_chosen)
     return df.to_dict()
@@ -329,12 +327,11 @@ def store_mods(mods_chosen):
 # Updates available models based on selected experiments
 @callback(Output("mod_dropdown","options"),
           Output("mod_dropdown","value"),
-            Input("exp_dropdown", "value"))
+            Input("exp_dropdown", "value"),
+            prevent_initial_call=True)
 def update_models(exps_chosen):
     #print("UPDATE MODELS")
     # If only one experiment is selected
-    if isinstance(exps_chosen, str):
-        exps_chosen = [exps_chosen]
     filtered_exps = results.query(f"Experiment_name == {exps_chosen}")          # type:ignore
     model_choices=[mod for mod in filtered_exps["Model_name"].unique().tolist()]
     return model_choices,model_choices
@@ -349,7 +346,6 @@ def update_models(exps_chosen):
           prevent_initial_call=True)
 def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
     #print("UPDATE HP")
-    #print(len(hp_struct))
     try: 
         exps = [exp for exp in exps_chosen["0"].values()]
     except KeyError:
@@ -362,20 +358,29 @@ def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
 
     query = f"Experiment_name == {exps} & "
     query += f"Model_name == {mods}"
-    filtered_res = results.query(query)  # type: ignore 
+    filt_res = results.query(query)  # type: ignore 
 
-    all_columns = [col for col in filtered_res.columns if not filtered_res[col].isnull().all()]
+    all_columns = [col for col in filt_res.columns if not filt_res[col].isnull().all()]
     if 'train_loss' in all_columns:
         hp_names_bf_acc = all_columns[0:all_columns.index('train_loss')]
-    
-    # Filter by maximum train accuracy higher than an input value
+
+    # Filter by accuracy threshold 
     if thrs == None or thrs == 0:
-        pass
+        filtered_res = filt_res
     else:
-        # Select all IDs that pass the acc threshold, that way we include the
-        # test accuracy and loss even if they are below the threshold
-        id=filtered_res["ID"][filtered_res["train_acc"]>=thrs].unique().tolist()
-        filtered_res = filtered_res.query(f"ID == {id}")
+        # Select all IDs and Iter # that pass the acc threshold, that way we 
+        # include the test accuracy and loss even if they are below the 
+        # threshold (If we dont group by Iter # we add all iters instead of 
+        # those above the threshold)
+        gb = filt_res.groupby(["ID","Iter #"]).max("train_acc") #type:ignore
+        idx_list = gb[gb["train_acc"]>=thrs].index
+        filtered_res = filt_res.drop(filt_res.index)
+        
+        for idx in idx_list:
+            id = idx[0]
+            it = idx[1]
+            df = filt_res[(filt_res["ID"]==id) & (filt_res["Iter #"]==it)]      #type:ignore
+            filtered_res = pd.concat([filtered_res,df],ignore_index=True)
 
     # Select which HP will be available to be filtered from all the HP
     # select all columns where values are not all NAN
@@ -391,19 +396,17 @@ def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
     # Find all the new different HP values
     all_drop_values = []
     for hp in hp_names:
+        # If the HP has a NAN value anywhere replace with Not specified
+        all_val = filtered_res[hp].fillna("Not specified")
         # Possible values for a HP
-        values = filtered_res[hp].unique().tolist()
-        # If the HP has a NAN value anywhere
-        if filtered_res[hp].isnull().any():
-            # replace nan with Not specified 
-            values_wo_nan = [val for val in values if not np.isnan(val)]
-            values = values_wo_nan[:]+["Not specified"]
+        values = all_val.unique().tolist()
+                
         all_drop_values.append(values)
     # if the accuracy threshold makes all the curves with a particular HP
-    # disappear add an empty list because that hp will not appear in hp_names
+    # disappear add Not specified because that hp will not appear in hp_names
     # but the callback will expect an output.
     nan_hp_idx = [hp_names_bf_acc.index(name) for name in hp_names_bf_acc if name not in hp_names]
-    [all_drop_values.insert(idx,[]) for idx in nan_hp_idx]
+    [all_drop_values.insert(idx,["Not specified"]) for idx in nan_hp_idx]
     return all_drop_values,all_drop_values
 
 # Updates accordion based on selected exps and mods
@@ -413,10 +416,6 @@ def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
           prevent_initial_call=True)      # no need to have exp as input
 def update_accordion(exps,mods):
     #print("UPDATE ACCORDION")
-    if isinstance(exps, str):
-        exps = [exps]
-    if isinstance(mods, str):
-        mods = [mods]
     accordion_items = []
     for exp in exps:
         for mod in mods:
@@ -432,28 +431,33 @@ def update_accordion(exps,mods):
 
 # Renders the importance display for the plots that are open
 @callback(
-    Output({"type": "importance", "index": MATCH}, "children"),
-    Input("accordion", "active_item"),
+    Output({"type": "importance", "index": ALL}, "children"),
+    [Input("accordion", "active_item")],    
     State("exp_dropdown", "value"),
     State("mod_dropdown", "value"),
     prevent_initial_call=True
 )
 def render_importance(active_item_id,exps,mods):
     #print("RENDER IMPORTANCE")
-    print(active_item_id)
-    if isinstance(exps, str):
-        exps = [exps]
-    if isinstance(mods, str):
-        mods = [mods]
+    
+    ret = []
+    m = 0
     for exp in exps:
         for mod in mods:
             if (exp,mod) in exp_mod_pairs:
-                imp_dict = importance[exp][mod]
-
+                n = exp_mod_pairs.index((exp,mod)) # index of the exp mod pair
+                if str(n) in active_item_id:
+                    ret.append(html.Div(f"This is ouput {n} and accordion {m}"))       #type:ignore
+                    m+=1
+                    #imp_dict = importance[exp][mod]
+                else: 
+                    ret.append(None)
+                    m+=1
+    return ret
     #match active_item_id with order of pairs that match exps mods
     #make it so I can have more than one active at a time
     #maybe fix this triggering twice
-    return html.Div(children=active_item_id)
+    #return ret
 
 # Plots accuracy
 @callback(Output(component_id="acc_plot",component_property="figure"),
@@ -479,7 +483,7 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
         mods = []
     thrs = None if thrs==[] else thrs[0]
 
-    # Filter by selected experiments, models and HP values
+    # Filter by selected experiments and models
     query = f"Experiment_name == {exps} & "
     query += f"Model_name == {mods}"
     filt_res = results.query(query) # type: ignore
@@ -504,7 +508,7 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
             df = filt_res[(filt_res["ID"]==id) & (filt_res["Iter #"]==it)]      #type:ignore
             filtered_res = pd.concat([filtered_res,df],ignore_index=True)
         add_thrs_line = True
-    #print(f"len after acc filter{len(filtered_res)}")
+
     # Filter by hyperparameters
     for val_list, id_dict in zip(hp_values,hp_ids):
         # Not specified corresponds to nan in HP value, so check for that 
@@ -512,8 +516,6 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
         if "Not specified" in val_list:
             query = f"{id_dict["index"]}.isnull() | {id_dict["index"]} == {val_list} "
             filtered_res = filtered_res.query(query)
-            continue
-        if val_list == []: # if the HP has no possible values (due to acc thrs)
             continue
         query = f"{id_dict["index"]} == {val_list} "
         filtered_res = filtered_res.query(query)
@@ -638,8 +640,6 @@ def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
         if "Not specified" in val_list:
             query = f"{id_dict["index"]}.isnull() | {id_dict["index"]} == {val_list} "
             filtered_res = filtered_res.query(query)
-            continue
-        if val_list == []:
             continue
         query = f"{id_dict["index"]} == {val_list} "
         filtered_res = filtered_res.query(query)
