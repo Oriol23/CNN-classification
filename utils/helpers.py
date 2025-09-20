@@ -382,7 +382,7 @@ def retrieve_results(experiment_name=None,model_name=None,extra=None):
     if extra is None:
         extra = "*"
 
-    print(f"[INFO] retrieving results from {RESULTS_DIRECTORY}")
+    print(f"[INFO] Retrieving results from {RESULTS_DIRECTORY}")
     list_of_paths = glob.glob(os.path.join(RESULTS_DIRECTORY,experiment_name,
                                            model_name,extra,RESULTS_FILENAME))
     if list_of_paths == []:
