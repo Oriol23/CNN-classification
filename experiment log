@@ -1,0 +1,30 @@
+------------------------- EXPERIMENT #1 --------------------------
+
+lr_sweep_1
+
+TinyVGG_1
+
+Performs a sweep over different lr and Hidden channels to see the best combinations.
+
+HYPERPARAMETERS = {'Hidden_Channels': [10,20,30],
+                   'Epochs': [10],
+                   'lr': [0.1,0.01,0.001],
+                   'Iter': [3], 
+                   'Size': [0.1],
+}
+
+All hidden channels performed similarly, with 20 and 30 being slightly better than 10.
+For learning rates, 0.1 and 0.01 performed similarly, with 0.1 being slightly better, and 0.001 was bad. 
+
+Highest acc was 0.873 for 20 hc and 0.1 lr
+
+-------------------------- RESULTS ---------------------------
+
+TinyVGG_1
+
+    Hidden_Channels: 20
+    lr: 0.01
+
+The chosen hidden channels are 20 because they have identical performance to 30 while being a simpler model.
+The chosen lr is 0.01 because it has identical performance to 0.1 and is smaller so less prone to oscillations in the loss. 
+

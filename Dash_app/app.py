@@ -6,8 +6,7 @@ import dash_daq as daq
 import plotly.graph_objects as go
 import plotly.colors as pc
 
-from app_utils import calculate_importance
-from app_utils import round_nnz
+
 
 import pandas as pd
 import numpy as np
@@ -25,6 +24,8 @@ if MAIN_DIRECTORY not in sys.path:
     sys.path.insert(0, str(MAIN_DIRECTORY))
 
 from utils.helpers import retrieve_results
+from Dash_app.app_utils import calculate_importance
+from Dash_app.app_utils import round_nnz
 
 img_path = os.path.join(MAIN_DIRECTORY,"Dash_app",
                         "assets","train_test_legend.png")
