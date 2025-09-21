@@ -97,5 +97,5 @@ def calculate_importance(grouped_res,exp_mod=None) -> Dict: #type:ignore
                         "Correlation":r,
                         "p-value":p,
                         "Importance":importance["importances_mean"]/sum(importance["importances_mean"]),#type:ignore
-                        "Uncertainty":importance["importances_std"]}}})
+                        "Uncertainty":importance["importances_std"]/sum(importance["importances_mean"])}}})#type:ignore
     return importance_database

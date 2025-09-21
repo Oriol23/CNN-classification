@@ -298,7 +298,8 @@ def render_tabs(tab,exps_dict,mods_dict):
                     n = exp_mod_pairs.index((exp,mod))#index of the exp mod pair
                     title = f"{exp} and {mod}"
                     accordion_items.append(dbc.AccordionItem(
-                        children=html.Div(id={"type":"importance","index":str(n)}),
+                        children=html.Div(id={"type":"importance_table",
+                                              "index":str(n)}),
                         title=title,
                         item_id=str(n),)) # item_id and "index" must match
 
@@ -430,7 +431,8 @@ def update_accordion(exps,mods):
                 n = exp_mod_pairs.index((exp,mod)) # index of the exp mod pair
                 title = f"{exp} and {mod}"
                 accordion_items.append(dbc.AccordionItem(
-                    children=html.Div(id={"type":"importance","index":str(n)}),
+                    children=html.Div(id={"type":"importance_table",
+                                          "index":str(n)}),
                     title=title,
                     item_id=str(n),)) # item_id and "index" must match
 
@@ -438,7 +440,7 @@ def update_accordion(exps,mods):
 
 # Renders the importance display for the plots that are open
 @callback(
-    Output({"type": "importance", "index": ALL}, "children"),
+    Output({"type": "importance_table", "index": ALL}, "children"),
     Output("importance_database","data"),
     [Input("accordion", "active_item")],    
     State("exp_dropdown", "value"),
@@ -506,15 +508,42 @@ def render_importance(active_item_id,exps,mods,importance_database,acc_st):
         # second nearest non zero for uncertainty
         # same as uncertainty for importance
         # second nearest nonzero for correlation and p
-        uncert = [round_nnz(val,1) for val in uncert]
+        uncert = [round_nnz(val) for val in uncert]
         mag = [-int(math.floor(math.log10(abs(x)))) for x in uncert]
-        imp = [round(imp[n],mag[n]+1) for n in range(len(mag))]
+        imp = [round(imp[n],mag[n]) for n in range(len(mag))]
         corr = [round_nnz(val,1) for val in corr]
         p = [round_nnz(val,1) for val in p]
+        #labels and colors for the bars displaying correlation and importance
+        ilabelsl = [f"{imp[n]}±{uncert[n]}" if imp[n] > 0.33 else "" 
+                    for n in range(len(p))]
+        ilabelsr = [f"{imp[n]}±{uncert[n]}" if imp[n] <= 0.33 else "" 
+                    for n in range(len(p))]
+        clabelsl = [f"{corr[n]}" if abs(corr[n]) > 0.33 else "" 
+                    for n in range(len(p))]
+        clabelsr = [f"{corr[n]}" if abs(corr[n]) <= 0.33 else "" 
+                    for n in range(len(p))]
+        colorc = ["#84D58B" if corr[n] >= 0 else "#FF5C5C"
+                    for n in range(len(p))]
 
         tb = [html.Tr([html.Td(hp_names[n]),
-                       html.Td(f"{imp[n]}±{uncert[n]}"),
-                       html.Td(corr[n]),
+
+                       html.Td(dbc.Progress([
+                            dbc.Progress(value=imp[n]*100, label=ilabelsl[n],
+                                    bar=True),
+                            dbc.Progress(value=100-imp[n]*100,color="#abb3ba", 
+                                    label=ilabelsr[n], bar=True),    
+                       ],)),
+
+                       html.Td(dbc.Progress([
+                            dbc.Progress(value=abs(corr[n]*100), 
+                                    label=clabelsl[n],
+                                    color=colorc[n],
+                                    bar=True),
+                            dbc.Progress(value=100*(1-abs(corr[n])), 
+                                    color="#abb3ba", 
+                                    label=clabelsr[n], bar=True),    
+                       ],)),
+
                        html.Td(p[n])]) for n in range(len(p))]
         table_body = [html.Tbody(tb)]
         
@@ -540,8 +569,6 @@ def render_importance(active_item_id,exps,mods,importance_database,acc_st):
     # Inserts None for all accordeons that are not open
     [imp_tables.insert(idx,None) for idx in empty_idxs]
 
-    ytnt = ["t" if t!=None else None for t in imp_tables]
-    print(ytnt)
     return imp_tables,importance_database
     #match active_item_id with order of pairs that match exps mods
     #make it so I can have more than one active at a time
