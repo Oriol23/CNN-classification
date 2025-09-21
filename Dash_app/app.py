@@ -34,7 +34,6 @@ img_source = "data:image/png;base64," + encoded
 
 results = retrieve_results()  # type: ignore
 grouped_res = results.groupby(["Experiment_name","Model_name"]) #type:ignore
-importance = calculate_importance(grouped_res)
 exp_mod_pairs = list(grouped_res.indices.keys())
 expn_uniq = results["Experiment_name"].unique().tolist() # type:ignore
 modn_uniq = results["Model_name"].unique().tolist() # type:ignore
@@ -174,6 +173,7 @@ app.layout = html.Div(children=[
     # lost when switching tabs. 
     dcc.Store(id="selected_exps"),
     dcc.Store(id="selected_mods"),
+    dcc.Store(id="importance_database",data={}),
 ])
 
 
@@ -213,23 +213,24 @@ def render_tabs(tab,exps_dict,mods_dict):
     
     elif tab == 'tab-2':
         try: 
-            exps_chosen = [exp for exp in exps_dict["0"].values()]
+            exps = [exp for exp in exps_dict["0"].values()]
         except KeyError:
-            exps_chosen = []
+            exps = []
         try:
-            mods_chosen = [exp for exp in mods_dict["0"].values()]
+            mods = [exp for exp in mods_dict["0"].values()]
         except KeyError:
-            mods_chosen = []
-        query = f"Experiment_name == {exps_chosen} & "
-        query += f"Model_name == {mods_chosen}"
-        filtered_res = results.query(query)  # type: ignore        
-
+            mods = []
+        
+        filtered_res = results[results["Experiment_name"].isin(exps)]# type: ignore
+        filtered_res = filtered_res[filtered_res["Model_name"].isin(mods)]# type: ignore
         # Select which HP will be available to be filtered from all the HP
         # select all columns where values are not all NAN 
         all_columns = [col for col in filtered_res.columns if not filtered_res[col].isnull().all()]
         # HP are by definition the columns before train_loss
         if 'train_loss' in all_columns:
             hp_names = all_columns[0:all_columns.index('train_loss')]
+            if 'Iter' in hp_names:
+                hp_names.append("Iter #")
         else:
             return html.Div([html.Br(),
                              "No experiments or models have been selected."])#,{}
@@ -335,8 +336,7 @@ def store_mods(mods_chosen):
             prevent_initial_call=True)
 def update_models(exps_chosen):
     #print("UPDATE MODELS")
-    # If only one experiment is selected
-    filtered_exps = results.query(f"Experiment_name == {exps_chosen}")          # type:ignore
+    filtered_exps = results[results["Experiment_name"].isin(exps_chosen)]        # type:ignore
     model_choices=[mod for mod in filtered_exps["Model_name"].unique().tolist()]
     return model_choices,model_choices
 
@@ -348,26 +348,27 @@ def update_models(exps_chosen):
           State({"type": "hp-dropdown", "index": ALL},"value"),
           Input({"type":"max_acc", "index": ALL},"value"), 
           prevent_initial_call=True)
-def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
+def update_hp(exps_dict,mods_dict,hp_struct,thrs):
     #print("UPDATE HP")
     try: 
-        exps = [exp for exp in exps_chosen["0"].values()]
+        exps = [exp for exp in exps_dict["0"].values()]
     except KeyError:
         exps = []
     try:
-        mods = [exp for exp in mods_chosen["0"].values()]
+        mods = [exp for exp in mods_dict["0"].values()]
     except KeyError:
         mods = []
     thrs = None if thrs==[] else thrs[0]
 
-    query = f"Experiment_name == {exps} & "
-    query += f"Model_name == {mods}"
-    filt_res = results.query(query)  # type: ignore 
+    # Filter by experiment and model
+    filt_res = results[results["Experiment_name"].isin(exps)]# type:ignore
+    filt_res = filt_res[filt_res["Model_name"].isin(mods)]# type:ignore
 
     all_columns = [col for col in filt_res.columns if not filt_res[col].isnull().all()]
     if 'train_loss' in all_columns:
         hp_names_bf_acc = all_columns[0:all_columns.index('train_loss')]
-
+        if 'Iter' in hp_names_bf_acc:
+            hp_names_bf_acc.append("Iter #")
     # Filter by accuracy threshold 
     if thrs == None or thrs == 0:
         filtered_res = filt_res
@@ -386,18 +387,19 @@ def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
             df = filt_res[(filt_res["ID"]==id) & (filt_res["Iter #"]==it)]      #type:ignore
             filtered_res = pd.concat([filtered_res,df],ignore_index=True)
 
-    # Select which HP will be available to be filtered from all the HP
-    # select all columns where values are not all NAN
+    # Now we select which HP will be available to be filtered from all the HP
+    # Select all columns where values are not all NAN
     all_columns = [col for col in filtered_res.columns if not filtered_res[col].isnull().all()]
     # HP are by definition the columns before train_loss
     if 'train_loss' in all_columns:
         hp_names = all_columns[0:all_columns.index('train_loss')]
+        if 'Iter' in hp_names:
+            hp_names.append("Iter #")
     else: # if no data above the threshold return empty for all
         all_drop_values = [[] for n in range(len(hp_struct))]
         return all_drop_values,all_drop_values
-        # raise PreventUpdate
 
-    # Find all the new different HP values
+    # Find all the new unique HP values
     all_drop_values = []
     for hp in hp_names:
         # If the HP has a NAN value anywhere replace with Not specified
@@ -406,9 +408,10 @@ def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
         values = all_val.unique().tolist()
 
         all_drop_values.append(values)
-    # if the accuracy threshold makes all the curves with a particular HP
-    # disappear add Not specified because that hp will not appear in hp_names
-    # but the callback will expect an output.
+    # if the accuracy threshold makes all the curves with a particular HP 
+    # specified disappear add Not specified because that hp will not appear in 
+    # hp_names but the callback will expect an output because the dropdown will
+    # not disappear.
     nan_hp_idx = [hp_names_bf_acc.index(name) for name in hp_names_bf_acc if name not in hp_names]
     [all_drop_values.insert(idx,["Not specified"]) for idx in nan_hp_idx]
     return all_drop_values,all_drop_values
@@ -419,7 +422,7 @@ def update_hp(exps_chosen,mods_chosen,hp_struct,thrs):
           Input("mod_dropdown", "value"), # so it will trigger the model input, 
           prevent_initial_call=True)      # no need to have exp as input
 def update_accordion(exps,mods):
-    #print("UPDATE ACCORDION")
+    print("UPDATE ACCORDION")
     accordion_items = []
     for exp in exps:
         for mod in mods:
@@ -436,14 +439,18 @@ def update_accordion(exps,mods):
 # Renders the importance display for the plots that are open
 @callback(
     Output({"type": "importance", "index": ALL}, "children"),
+    Output("importance_database","data"),
     [Input("accordion", "active_item")],    
     State("exp_dropdown", "value"),
     State("mod_dropdown", "value"),
+    State("importance_database","data"),
+    Input("accordion","children"), # to make this trigger after update accordion
     prevent_initial_call=True
 )
-def render_importance(active_item_id,exps,mods):
-    #print("RENDER IMPORTANCE")
-    
+def render_importance(active_item_id,exps,mods,importance_database,acc_st):
+    print("RENDER IMPORTANCE")
+    if active_item_id == None:
+        active_item_id = []
     empty_idxs = []
     good_pairs = []
     imp_tables = []
@@ -464,27 +471,26 @@ def render_importance(active_item_id,exps,mods):
                 n = exp_mod_pairs.index((exp,mod)) # index of the exp mod pair
                 if str(n) in active_item_id:
                     good_pairs.append((exp,mod))
-                    #ordered_tables.append(0)
                     m+=1
-                else: 
+                    try:
+                        importance = importance_database[exp][mod]
+                    except KeyError:
+                        importance = calculate_importance(grouped_res=grouped_res,
+                                                          exp_mod=(exp,mod))
+                        importance_database.update(importance)
+                else:
                     empty_idxs.append(m)
                     m+=1
     
     for (exp,mod) in good_pairs:
-        hp_names = importance[exp][mod]["Hyperparameters"]
-        corr = importance[exp][mod]["Correlation"]
-        p = importance[exp][mod]["p-value"]
-        imp = importance[exp][mod]["Importance"]
-        uncert = importance[exp][mod]["Uncertainty"]
+        hp_names = importance_database[exp][mod]["Hyperparameters"]
+        corr = importance_database[exp][mod]["Correlation"]
+        p = importance_database[exp][mod]["p-value"]
+        imp = importance_database[exp][mod]["Importance"]
+        uncert = importance_database[exp][mod]["Uncertainty"]
 
         # Creates a table 
 
-        #header_names = ["Hyperparameters","Importance","Correlation","p-value"]
-
-        #table_header = [html.Thead(html.Tr(
-        #    [html.Th(header) for header in header_names]
-        #    ))]
-        
         table_header = [html.Thead(html.Tr(
             [html.Th([html.Span("Hyperparameters"),info_hp]),
              #html.Th(["Importance",info_imp]),
@@ -497,12 +503,12 @@ def render_importance(active_item_id,exps,mods):
 
 
         # rounding
-        # nearest non zero for uncertainty
+        # second nearest non zero for uncertainty
         # same as uncertainty for importance
         # second nearest nonzero for correlation and p
-        uncert = [round_nnz(val) for val in uncert]
+        uncert = [round_nnz(val,1) for val in uncert]
         mag = [-int(math.floor(math.log10(abs(x)))) for x in uncert]
-        imp = [round(imp[n],mag[n]) for n in range(len(mag))]
+        imp = [round(imp[n],mag[n]+1) for n in range(len(mag))]
         corr = [round_nnz(val,1) for val in corr]
         p = [round_nnz(val,1) for val in p]
 
@@ -517,11 +523,15 @@ def render_importance(active_item_id,exps,mods):
 
         table = dbc.Container([
             dbc.Table(table_header + table_body, bordered=True),
-            dbc.Tooltip(children="This is some info about Importance", 
+            dbc.Tooltip(children="Permutation feature importance of a random "
+                "forest regressor with the training loss as target. "
+                "Normalized to 1.", 
                 target="info-imp", placement="top"),
-            dbc.Tooltip(children="This is some info about Correlation", 
+            dbc.Tooltip(children="Pearson correlation coefficient of each "
+                "hyperparameter with the training loss.", 
                 target="info-corr", placement="top"),
-            dbc.Tooltip(children="This is some info about Hyperparameters", 
+            dbc.Tooltip(children="Only numerical hyperparameters with more than"
+            " one value, categorical hyperparameters are discarded.",
                 target="info-hp", placement="top"),
         ]
         )
@@ -530,10 +540,9 @@ def render_importance(active_item_id,exps,mods):
     # Inserts None for all accordeons that are not open
     [imp_tables.insert(idx,None) for idx in empty_idxs]
 
-
-    #imp_tables.append(html.Div(f"This is ouput {n} <span>&#177;</span>"))       #type:ignore
-
-    return imp_tables
+    ytnt = ["t" if t!=None else None for t in imp_tables]
+    print(ytnt)
+    return imp_tables,importance_database
     #match active_item_id with order of pairs that match exps mods
     #make it so I can have more than one active at a time
     #maybe fix this triggering twice
@@ -548,26 +557,24 @@ def render_importance(active_item_id,exps,mods):
           Input({"type": "hp-dropdown", "index": ALL},"id"),
           Input({"type":"max_acc", "index": ALL},"value"),
             )
-def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
+def plot_acc(acc_legend,exps_dict,mods_dict,hp_values,hp_ids,thrs):
     #print("PLOT ACC")
     color_palette = pc.qualitative.Dark24
     colors = iter(color_palette)
 
     try: 
-        exps = [exp for exp in exps_chosen["0"].values()]
+        exps = [exp for exp in exps_dict["0"].values()]
     except KeyError:
         exps = []
     try:
-        mods = [mod for mod in mods_chosen["0"].values()]
+        mods = [mod for mod in mods_dict["0"].values()]
     except KeyError:
         mods = []
     thrs = None if thrs==[] else thrs[0]
 
     # Filter by selected experiments and models
-    query = f"Experiment_name == {exps} & "
-    query += f"Model_name == {mods}"
-    filt_res = results.query(query) # type: ignore
-
+    filt_res = results[results["Experiment_name"].isin(exps)]# type:ignore
+    filt_res = filt_res[filt_res["Model_name"].isin(mods)]# type:ignore
     # Filter by accuracy threshold (goes before HP because it 
     # modifies possible HP to choose)
     if thrs == None or thrs == 0:
@@ -594,12 +601,10 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
         # Not specified corresponds to nan in HP value, so check for that 
         # alongside the other specified values
         if "Not specified" in val_list:
-            query = f"{id_dict["index"]}.isnull() | {id_dict["index"]} == {val_list} "
-            filtered_res = filtered_res.query(query)
+            filtered_res= filtered_res[(filtered_res[id_dict["index"]].isnull()) 
+                            | (filtered_res[id_dict["index"]].isin(val_list))]
             continue
-        query = f"{id_dict["index"]} == {val_list} "
-        filtered_res = filtered_res.query(query)
-
+        filtered_res=filtered_res[filtered_res[id_dict["index"]].isin(val_list)]
 
     fig = go.Figure()
 
@@ -683,24 +688,24 @@ def plot_acc(acc_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
           Input({"type": "hp-dropdown", "index": ALL},"id"),
           Input({"type":"max_acc", "index": ALL},"value"),
           )
-def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
+def plot_loss(loss_legend,exps_dict,mods_dict,hp_values,hp_ids,thrs):
     #print("PLOT LOSS")
     color_palette = pc.qualitative.Dark24
     colors = iter(color_palette)
 
     try: 
-        exps = [exp for exp in exps_chosen["0"].values()]
+        exps = [exp for exp in exps_dict["0"].values()]
     except KeyError:
         exps = []
     try:
-        mods = [mod for mod in mods_chosen["0"].values()]
+        mods = [mod for mod in mods_dict["0"].values()]
     except KeyError:
         mods = []
     thrs = None if thrs==[] else thrs[0]
+
     # Filter by experiment and model
-    query = f"Experiment_name == {exps} & "
-    query += f"Model_name == {mods}"
-    filt_res = results.query(query) # type: ignore
+    filt_res = results[results["Experiment_name"].isin(exps)]# type:ignore
+    filt_res = filt_res[filt_res["Model_name"].isin(mods)]# type:ignore
 
     # Filter by accuracy threshold
     if thrs == None or thrs == 0:
@@ -717,11 +722,11 @@ def plot_loss(loss_legend,exps_chosen,mods_chosen,hp_values,hp_ids,thrs):
     # Filter by hyperparameter
     for val_list, id_dict in zip(hp_values,hp_ids):
         if "Not specified" in val_list:
-            query = f"{id_dict["index"]}.isnull() | {id_dict["index"]} == {val_list} "
-            filtered_res = filtered_res.query(query)
+            filtered_res= filtered_res[(filtered_res[id_dict["index"]].isnull()) 
+                            | (filtered_res[id_dict["index"]].isin(val_list))]
             continue
-        query = f"{id_dict["index"]} == {val_list} "
-        filtered_res = filtered_res.query(query)
+        filtered_res=filtered_res[filtered_res[id_dict["index"]].isin(val_list)]
+
     fig = go.Figure()
 
     for id in filtered_res["ID"].unique():

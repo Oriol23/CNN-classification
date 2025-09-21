@@ -30,26 +30,34 @@ def round_nnz(x,n_extra=0):
     return round(x, decimals+n_extra)
 
 
-def calculate_importance(grouped_res) -> Dict: #type:ignore
+def calculate_importance(grouped_res,exp_mod=None) -> Dict: #type:ignore
     """Calculates feature importance and correlation.
     
     Takes the values of the hyperparameters used to train a model and the 
     training loss and calculates every hyperparameter's importance using 
     permutation importance with a random forest regresson, and the correlation 
-    to the train loss using Pearson's coefficient. 
+    to the train loss using Pearson's coefficient. If exp_mod is specified, it
+    calculates that for a single pair, otherwise it does so for all pairs.
     
     Args: 
         grouped_res: a dataframe with data that has been grouped based on two 
-            columns, experiment and model. 
+            columns, experiment and model.
+        exp_mod: a tuple or list with a particular pair of experiment and model, 
+            belonging to a valid pair of indices. 
         
     Returns:
         A dictionary containing the correlation and importance, separated by 
-        experiment and model. 
+        experiment and model.
     """
-    
     print("[INFO] Calculating importance...")
     importance_database = {}
-    for exp,mod in grouped_res.indices.keys():
+    
+    if exp_mod == None:
+        pairs = grouped_res.indices.keys()
+    else: 
+        pairs = [exp_mod]
+
+    for exp,mod in pairs:
         df = grouped_res.get_group((exp,mod))
         col_y = "train_loss"
         col_X = df.columns.to_list()[0:df.columns.to_list().index("train_loss")] 
