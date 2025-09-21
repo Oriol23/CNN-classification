@@ -1,4 +1,4 @@
-from dash import Dash, dcc, html, Input, Output, State, callback, ALL, MATCH
+from dash import Dash, dcc, html, Input, Output, State, callback, ALL, MATCH, callback_context
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 import dash_daq as daq
@@ -577,18 +577,24 @@ def render_importance(active_item_id,exps,mods,importance_database,acc_st):
 
 # Plots accuracy
 @callback(Output(component_id="acc_plot",component_property="figure"),
-          Input(component_id="acc_legend_toggle",component_property="on"),
+          Input("acc_legend_toggle","on"),
           Input("selected_exps", "data"),
           Input("selected_mods", "data"),
           Input({"type": "hp-dropdown", "index": ALL},"value"),
           Input({"type": "hp-dropdown", "index": ALL},"id"),
           Input({"type":"max_acc", "index": ALL},"value"),
+          State("acc_plot","figure")
             )
-def plot_acc(acc_legend,exps_dict,mods_dict,hp_values,hp_ids,thrs):
+def plot_acc(acc_legend,exps_dict,mods_dict,hp_values,hp_ids,thrs,current_fig):
     #print("PLOT ACC")
     color_palette = pc.qualitative.Dark24
     colors = iter(color_palette)
 
+    triggered = callback_context.triggered_id
+    if triggered == "acc_legend_toggle":
+        fig = go.Figure(current_fig)
+        fig.update_layout(showlegend=acc_legend)
+        return fig
     try: 
         exps = [exp for exp in exps_dict["0"].values()]
     except KeyError:
@@ -708,18 +714,25 @@ def plot_acc(acc_legend,exps_dict,mods_dict,hp_values,hp_ids,thrs):
     return fig
 
 @callback(Output(component_id="loss_plot",component_property="figure"),
-          Input(component_id="loss_legend_toggle",component_property="on"),
+          Input("loss_legend_toggle","on"),
           Input("selected_exps", "data"),
           Input("selected_mods", "data"),
           Input({"type": "hp-dropdown", "index": ALL},"value"),
           Input({"type": "hp-dropdown", "index": ALL},"id"),
           Input({"type":"max_acc", "index": ALL},"value"),
+          State("loss_plot","figure")
           )
-def plot_loss(loss_legend,exps_dict,mods_dict,hp_values,hp_ids,thrs):
+def plot_loss(loss_legend,exps_dict,mods_dict,hp_values,hp_ids,thrs,current_fig):
     #print("PLOT LOSS")
     color_palette = pc.qualitative.Dark24
     colors = iter(color_palette)
 
+    triggered = callback_context.triggered_id
+    if triggered == "loss_legend_toggle":
+        fig = go.Figure(current_fig)
+        fig.update_layout(showlegend=loss_legend)
+        return fig
+    
     try: 
         exps = [exp for exp in exps_dict["0"].values()]
     except KeyError:
