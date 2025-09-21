@@ -423,7 +423,7 @@ def update_hp(exps_dict,mods_dict,hp_struct,thrs):
           Input("mod_dropdown", "value"), # so it will trigger the model input, 
           prevent_initial_call=True)      # no need to have exp as input
 def update_accordion(exps,mods):
-    print("UPDATE ACCORDION")
+    #print("UPDATE ACCORDION")
     accordion_items = []
     for exp in exps:
         for mod in mods:
@@ -450,7 +450,7 @@ def update_accordion(exps,mods):
     prevent_initial_call=True
 )
 def render_importance(active_item_id,exps,mods,importance_database,acc_st):
-    print("RENDER IMPORTANCE")
+    #print("RENDER IMPORTANCE")
     if active_item_id == None:
         active_item_id = []
     empty_idxs = []
